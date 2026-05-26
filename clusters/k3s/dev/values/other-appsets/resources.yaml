@@ -1,0 +1,36 @@
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+
+microservices:
+  # --- 1. example-app1 ---
+  example-app1:
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+  # --- 2. example-app2 ---
+  example-app2:
+    resources:
+      requests:
+        cpu: "300m"
+        memory: "512Mi"
+      limits:
+        cpu: "700m"
+        memory: "1Gi"
+  # --- 3. example-app3 ---
+  example-app3:
+    resources:
+      requests:
+        cpu: "150m"
+        memory: "256Mi"
+      limits:
+        cpu: "400m"
+        memory: "512Mi"

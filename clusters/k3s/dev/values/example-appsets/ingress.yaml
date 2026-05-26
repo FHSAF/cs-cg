@@ -1,0 +1,20 @@
+ingress:
+  enabled: false
+  className: "nginx"
+
+microservices:
+  # --- 1. example-app1 ---
+  example-app1:
+    host: "app1.example.com"
+    paths:
+      - "/"
+  # --- 2. example-app2 ---
+  example-app2:
+    host: "app2.example.com"
+    paths:
+      - "/"
+  # --- 3. example-app3 ---
+  example-app3:
+    host: "app3.example.com"
+    paths:
+      - "/"

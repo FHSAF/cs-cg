@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: dev-sa-appsets
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          
+          - name: example-app1
+          - name: example-app2
+          - name: example-app3
+  template:
+    metadata:
+      name: "dev-{{ .name }}"
+      namespace: argocd
+    spec:
+      project: argocd-dev-project
+      source:
+        repoURL: "https://github.com/FHSAF/cs-cg.git"
+        targetRevision: dev
+        path: charts/example-apps
+        helm:
+          valueFiles:
+            - ../../clusters/k3s/dev/values/example-appsets-values.yaml
+            - ../../clusters/k3s/dev/values/example-appsets/images.yaml
+            # Ingress values
+            - ../../clusters/k3s/dev/values/example-appsets/ingress.yaml
+            # Service values
+            - ../../clusters/k3s/dev/values/example-appsets/services.yaml
+            # Resources values
+            - ../../clusters/k3s/dev/values/example-appsets/resources.yaml
+          values: |
+            nameOverride: {{ .name }}
+      destination:
+        server: "https://kubernetes.default.svc"
+        namespace: dev
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
