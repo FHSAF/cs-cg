@@ -77,3 +77,5 @@ apps:
       - repoURL: "{{ .Values.repoURL }}"
         targetRevision: "{{ .Values.targetRevision }}"
         path: clusters/{{ .Values.clusterName }}/_core/values/certificates
+  cert-manager:
+    enabled: true
