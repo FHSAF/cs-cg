@@ -1,0 +1,23 @@
+# TEST 02 – extraPath
+# kps with an extraPath pointing to a selfRepo directory.
+# Verifies: a third source is emitted using $.Values.repoURL and the given path.
+projectName: test-cluster
+repoURL: https://github.com/example/repo.git
+targetRevision: main
+destinationServer: https://kubernetes.default.svc
+environment: test
+
+apps:
+  kps:
+    enabled: true
+    namespace: monitoring
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: https://prometheus-community.github.io/helm-charts
+      targetRevision: 82.4.0
+      name: kube-prometheus-stack
+    extraPath: "clusters/test-cluster/test/values/kps-addons"
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -1,0 +1,50 @@
+replicaCount: 0
+global:
+  gitOps:
+    repoURL: "https://github.com/FHSAF/cs-cg.git"
+  image:
+    pullSecret: "harbor-pull-secret-project-ds"
+    repositoryBase: "harbor.tecomon.net/project/"
+  tenant: "default"
+  microserviceDb: true
+  microserviceRmq: true
+# ==========================================================
+# Application-specific values
+# ==========================================================
+image:
+  pullSecret: "harbor-pull-secret-project-ds"
+  repositoryBase: "harbor.tecomon.net/project/"
+  tag: "0.1.0-main.0"
+service:
+  enabled: false
+ingress:
+  enabled: false
+serviceAccount:
+  create: false
+# Optional Deployment strategy override.
+# Leave unset to keep Kubernetes' default RollingUpdate behavior.
+# Example:
+# deploymentStrategy:
+#   type: Recreate
+redis:
+  enabled: false
+tenant: "default"
+microserviceDb: false
+microserviceRmq: false
+
+# ==========================================================
+#              ARGOCD IMAGE UPDATER CONFIGURATION
+# ==========================================================
+argocdImageUpdater:
+  enabled: false
+  gitCredsSecretName: "git-creds"
+  branch: "main"
+  updateStrategy: "newest-build"
+  # Optional tag filter passed to Argo CD Image Updater.
+  # Example for dev builds: regexp:^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$
+  allowTags: ""
+  # Path to the DEDICATED IMAGES values file (relative to chart path).
+  # Pattern: ../../clusters/{project}/{env}/values/{project}/images.yaml
+  # ArgoCD Image Updater writes ONLY to this file; all other config stays
+  # in the main values file next to it.
+  valuesPath: "../../clusters/project/dev/values/project/images.yaml"

@@ -1,0 +1,21 @@
+# TEST 01 – Minimal override
+# Only enables valkey with no extra config.
+# Verifies: convention value-file path is auto-generated from envPrefix + appName.
+projectName: test-cluster
+repoURL: https://github.com/example/repo.git
+targetRevision: main
+destinationServer: https://kubernetes.default.svc
+environment: test
+
+apps:
+  valkey:
+    enabled: true
+    namespace: valkey
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: https://valkey.io/valkey-helm/
+      targetRevision: 0.9.0
+      name: valkey
+    syncOptions:
+      - CreateNamespace=true

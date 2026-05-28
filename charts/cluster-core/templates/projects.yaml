@@ -1,0 +1,60 @@
+{{- range $proj := .Values.projects }}
+{{- if ne $proj.enabled false }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ $proj.name }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-options: CreateNamespace=true
+spec:
+  description: {{ $proj.description | default (printf "Project %s" $proj.name) }}
+  
+  # Allow all source repos by default, or restrict if defined in values
+  sourceRepos:
+  {{- if $proj.sourceRepos }}
+    {{- toYaml $proj.sourceRepos | nindent 4 }}
+  {{- else }}
+    - '*'
+  {{- end }}
+
+  # Destinations (Clusters/Namespaces)
+  destinations:
+    {{- toYaml $proj.destinations | nindent 4 }}
+
+  # Allow all cluster resources by default (CRDs, etc)
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  # -------------------------------------------------------
+  # ROLES GENERATION LOGIC
+  # -------------------------------------------------------
+  roles:
+  {{- range $role := $proj.roles }}
+    - name: {{ $role.name }}
+      description: {{ $role.description | default "" }}
+      # AUTOMATICALLY MAP ROLE NAME TO GROUP NAME
+      groups:
+        - {{ $role.name }}
+      
+      policies:
+      {{- range $policy := $role.policies }}
+        {{- $resources := $policy.resources }}
+        {{- $verbs := $policy.verbs }}
+        {{- $objects := $policy.objects }}
+        
+        {{- /* 3-Level Nested Loop to generate every permission combination */}}
+        {{- range $r := $resources }}
+          {{- range $v := $verbs }}
+            {{- range $o := $objects }}
+        # Format: p, proj:PROJECT:ROLE, RESOURCE, ACTION, PROJECT/OBJECT, allow
+        - p, proj:{{ $proj.name }}:{{ $role.name }}, {{ $r }}, {{ $v }}, {{ $proj.name }}/{{ $o }}, allow
+            {{- end }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}

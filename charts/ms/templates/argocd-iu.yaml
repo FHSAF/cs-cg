@@ -1,0 +1,41 @@
+{{- $configJson := include "mychart.getConfig" . -}}
+{{- $config := $configJson | fromJson -}}
+---
+{{- if $config.argocdImageUpdater.enabled }}
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: {{ .Release.Name }}-image-updater
+  namespace: argocd
+spec:
+  # Where Argo CD Application objects live
+  namespace: argocd
+  # Global write-back config (shared repo + branch + creds)
+  writeBackConfig:
+    method: "git:secret:argocd/{{ $config.argocdImageUpdater.gitCredsSecretName }}"
+    gitConfig:
+      repository: {{ $config.global.gitOps.repoURL }}
+      branch: {{ $config.argocdImageUpdater.branch }}
+  applicationRefs:
+    # ----{{ .Release.Name }} -------------------------------------------------
+    - namePattern: "{{ .Release.Name }}"
+      images:
+        - alias: {{ .Release.Name }}
+          imageName: {{ $config.image.repositoryBase }}{{ $config.image.imageName }}
+          manifestTargets:
+            helm:
+              # keys inside values file - using nested path
+              name: "microservices.{{ $config.image.imageName }}.image.fullImageName"
+              tag: "microservices.{{ $config.image.imageName }}.image.tag"
+          commonUpdateSettings:
+            updateStrategy: {{ $config.argocdImageUpdater.updateStrategy | default "latest" }}
+            {{- if $config.argocdImageUpdater.allowTags }}
+            allowTags: {{ $config.argocdImageUpdater.allowTags | quote }}
+            {{- end }}
+            forceUpdate: true
+      # Values file (relative to spec.source.path in Application)
+      writeBackConfig:
+        method: "git:secret:argocd/{{ $config.argocdImageUpdater.gitCredsSecretName }}"
+        gitConfig:
+          writeBackTarget: "helmvalues:{{ $config.argocdImageUpdater.valuesPath }}"
+{{- end }}

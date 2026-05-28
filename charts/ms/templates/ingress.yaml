@@ -1,0 +1,71 @@
+{{- $configJson := include "mychart.getConfig" . -}}
+{{- $config := $configJson | fromJson -}}
+{{- if $config.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    nginx.org/proxy-connect-timeout: {{ default "60s" $config.ingress.proxyConnectTimeout | quote }}
+    nginx.org/proxy-read-timeout: {{ default "60s" $config.ingress.proxyReadTimeout | quote }}
+    nginx.org/proxy-send-timeout: {{ default "60s" $config.ingress.proxySendTimeout | quote }}
+
+    # nginx.org/client-max-body-size: {{ default "50m" $config.ingress.clientMaxBodySize | quote }} # default is 1m, which is too small for some applications, such as harbor
+
+    nginx.org/proxy-buffering: {{ default "true" $config.ingress.proxyBuffering | quote }}
+    nginx.org/proxy-buffer-size: "128k"
+    nginx.org/proxy-buffers: "4 256k"
+    nginx.org/proxy-busy-buffers-size: "256k"
+    nginx.org/proxy-max-temp-file-size: "1024m"
+    
+    {{- if $config.ingress.annotations }}
+    {{- toYaml $config.ingress.annotations | nindent 4 }}
+    {{- end }}
+    {{- if $config.ingress.svcVersions }}
+    {{- /*
+      svcVersions: true → two locations injected into this env's server block:
+        /svc-versions      – proxies to the static HTML page in error-pages
+        /svc-versions-data – returns JSON inline via return 200, built from
+                             .Values.microservices at Helm render time.
+      Serving the JSON inline (not from error-pages) means each env (dev/stage)
+      returns its own tags. JSON is ~1400 chars max – well under NGINX's 4096
+      token limit. Updated on every ArgoCD sync triggered by a tag change.
+    */}}
+    {{- $entries := list -}}
+    {{- range $name, $msCfg := .Values.microservices -}}
+      {{- if and $msCfg.image $msCfg.image.tag -}}
+        {{- $entries = append $entries (printf `"%s":"%s"` $name $msCfg.image.tag) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $json := printf `{"env":"%s","services":{%s}}` $config.tenant (join "," $entries) }}
+    nginx.org/server-snippets: |
+      location = /svc-versions {
+        proxy_pass http://error-pages.ingress-utils.svc.cluster.local:80/svc-versions.html;
+        proxy_set_header Host $host;
+      }
+      location = /svc-versions-data {
+        default_type application/json;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Access-Control-Allow-Origin "*";
+        return 200 '{{ $json }}';
+      }
+    {{- end }}
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: {{ $config.ingress.host | quote }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Release.Name }}
+            port:
+              number: {{ $config.service.port }}
+  tls:
+  - hosts:
+    - {{ $config.ingress.host | quote }}
+    secretName: {{ $config.ingress.tlsSecretName }}
+{{- end }}

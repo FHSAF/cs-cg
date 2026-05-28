@@ -1,0 +1,179 @@
+{{- range $appName, $appConfig := .Values.apps }}
+{{- if $appConfig.instances }}
+{{/* ================================================================
+     FAN-OUT MODE — one Application generated per instance entry.
+     Parent key supplies shared config; each instance provides name
+     and namespace (with optional per-instance syncWave override).
+     ================================================================ */}}
+{{- if ne $appConfig.enabled false }}
+{{- range $inst := $appConfig.instances }}
+{{- if ne $inst.enabled false }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $inst.name }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ $inst.syncWave | default $appConfig.syncWave | default "0" | quote }}
+  labels:
+    app.kubernetes.io/managed-by: Helm
+spec:
+  project: {{ $appConfig.project | default "default" }}
+  {{- if $appConfig.ignoreDifferences }}
+  ignoreDifferences:
+    {{- toYaml $appConfig.ignoreDifferences | nindent 4 }}
+  {{- end }}
+  destination:
+    server: {{ $.Values.destinationServer }}
+    namespace: {{ $inst.namespace }}
+  sources:
+    {{- if $appConfig.localChart }}
+    {{/* Merge per-instance extraValueFiles into the localChart config */}}
+    {{- $mergedApp := deepCopy $appConfig }}
+    {{- if $inst.extraValueFiles }}
+    {{- $merged := merge (dict "localChart" (merge (deepCopy $appConfig.localChart) (dict "extraValueFiles" (concat ($appConfig.localChart.extraValueFiles | default list) $inst.extraValueFiles)))) $mergedApp }}
+    {{- include "opensource-services.localChartSource" (dict "app" $merged "appName" $inst.name "context" $) | nindent 4 }}
+    {{- else }}
+    {{- include "opensource-services.localChartSource" (dict "app" $appConfig "appName" $inst.name "context" $) | nindent 4 }}
+    {{- end }}
+    {{- else if $appConfig.chart }}
+    {{- include "opensource-services.chartSource" (dict "app" $appConfig "appName" $inst.name "context" $) | nindent 4 }}
+    {{- end }}
+    {{- include "opensource-services.valuesRefSource" (dict "context" $) | nindent 4 }}
+    {{- if $appConfig.extraPath }}
+    - repoURL: {{ $.Values.repoURL }}
+      targetRevision: {{ $.Values.targetRevision }}
+      path: {{ include "opensource-services.render" (dict "val" $appConfig.extraPath "context" $) }}
+    {{- end }}
+    {{- range $appConfig.extraSources }}
+    {{- include "opensource-services.genericSource" (dict "source" . "context" $) | nindent 4 }}
+    {{- end }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    {{- if $appConfig.syncOptions }}
+    syncOptions:
+      {{- toYaml $appConfig.syncOptions | nindent 6 }}
+    {{- end }}
+    {{- if $appConfig.retry }}
+    retry:
+      {{- toYaml $appConfig.retry | nindent 6 }}
+    {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- else }}
+{{/* ================================================================
+     SINGLE MODE — one Application per top-level key (existing logic)
+     ================================================================ */}}
+{{- if ne $appConfig.enabled false }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ $appConfig.syncWave | default "0" | quote }}
+  labels:
+    app.kubernetes.io/managed-by: Helm
+spec:
+  project: {{ $appConfig.project | default "default" }}
+
+  {{- if $appConfig.ignoreDifferences }}
+  ignoreDifferences:
+    {{- toYaml $appConfig.ignoreDifferences | nindent 4 }}
+  {{- end }}
+
+  destination:
+    server: {{ $.Values.destinationServer }}
+    namespace: {{ $appConfig.namespace }}
+
+  # =================================================================
+  # SOURCE SELECTION (priority order)
+  #
+  # 1. sources   — escape hatch: fully-custom list, rendered verbatim
+  # 2. chart     — DRY default; auto-generates:
+  #                  a) helm chart source  (chart + convention valueFile)
+  #                  b) values-ref source  ($values reference, always injected)
+  #                  c) extraPath source   (selfRepo path, only when set)
+  #                  d) extraSources       (any number of custom additions)
+  # 3. source    — legacy single-source for plain-path / directory apps
+  # =================================================================
+
+  {{- if $appConfig.sources }}
+  {{/* ---- ESCAPE HATCH: fully custom sources list ---- */}}
+  sources:
+    {{- range $appConfig.sources }}
+    {{- include "opensource-services.genericSource" (dict "source" . "context" $) | nindent 4 }}
+    {{- end }}
+
+  {{- else if $appConfig.localChart }}
+  {{/* ---- LOCAL CHART: selfRepo path chart, auto-assembles sources ---- */}}
+  sources:
+    {{/* (a) local chart source — convention valueFile, respects valuesDir */}}
+    {{- include "opensource-services.localChartSource" (dict "app" $appConfig "appName" $appName "context" $) | nindent 4 }}
+    {{/* (b) Values-ref source — always injected to support $values in valueFiles */}}
+    {{- include "opensource-services.valuesRefSource" (dict "context" $) | nindent 4 }}
+    {{/* (c) Extra-path source — selfRepo path, rendered only when extraPath is set */}}
+    {{- if $appConfig.extraPath }}
+    - repoURL: {{ $.Values.repoURL }}
+      targetRevision: {{ $.Values.targetRevision }}
+      path: {{ include "opensource-services.render" (dict "val" $appConfig.extraPath "context" $) }}
+    {{- end }}
+    {{/* (d) Additional fully-custom sources appended at the end */}}
+    {{- range $appConfig.extraSources }}
+    {{- include "opensource-services.genericSource" (dict "source" . "context" $) | nindent 4 }}
+    {{- end }}
+
+  {{- else if $appConfig.chart }}
+  {{/* ---- DRY DEFAULT: auto-assembled sources ---- */}}
+  sources:
+    {{/* (a) Helm chart source — value file path uses convention unless overridden */}}
+    {{- include "opensource-services.chartSource" (dict "app" $appConfig "appName" $appName "context" $) | nindent 4 }}
+    {{/* (b) Values-ref source — always injected to support $values in valueFiles */}}
+    {{- include "opensource-services.valuesRefSource" (dict "context" $) | nindent 4 }}
+    {{/* (c) Extra-path source — selfRepo path, rendered only when extraPath is set */}}
+    {{- if $appConfig.extraPath }}
+    - repoURL: {{ $.Values.repoURL }}
+      targetRevision: {{ $.Values.targetRevision }}
+      path: {{ include "opensource-services.render" (dict "val" $appConfig.extraPath "context" $) }}
+    {{- end }}
+    {{/* (d) Additional fully-custom sources appended at the end */}}
+    {{- range $appConfig.extraSources }}
+    {{- include "opensource-services.genericSource" (dict "source" . "context" $) | nindent 4 }}
+    {{- end }}
+
+  {{- else if $appConfig.source }}
+  {{/* ---- LEGACY: single source ---- */}}
+  source:
+    repoURL: {{ include "opensource-services.render" (dict "val" $appConfig.source.repoURL "context" $) }}
+    targetRevision: {{ include "opensource-services.render" (dict "val" $appConfig.source.targetRevision "context" $) }}
+    path: {{ include "opensource-services.render" (dict "val" $appConfig.source.path "context" $) }}
+    {{- if $appConfig.source.directory }}
+    directory:
+      {{- toYaml $appConfig.source.directory | nindent 6 }}
+    {{- end }}
+  {{- end }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    {{- if $appConfig.syncOptions }}
+    syncOptions:
+      {{- toYaml $appConfig.syncOptions | nindent 6 }}
+    {{- end }}
+    {{- if $appConfig.retry }}
+    retry:
+      {{- toYaml $appConfig.retry | nindent 6 }}
+    {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

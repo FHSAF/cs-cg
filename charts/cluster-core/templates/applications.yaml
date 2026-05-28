@@ -1,0 +1,79 @@
+{{- range $appName, $appConfig := .Values.apps }}
+{{- if ne $appConfig.enabled false }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ $appConfig.syncWave | default "0" | quote }}
+  labels:
+    app.kubernetes.io/managed-by: Helm
+spec:
+  project: {{ $appConfig.project | default "default" }}
+
+  # Adding Ignore Differences if specified in values
+  {{- if $appConfig.ignoreDifferences }}
+  ignoreDifferences:
+    {{- toYaml $appConfig.ignoreDifferences | nindent 4 }}
+  {{- end }}
+  
+  destination:
+    server: {{ $.Values.destinationServer }}
+    namespace: {{ $appConfig.namespace }}
+
+  # -------------------------------------------------------
+  # SOURCE LOGIC (Handles "source" vs "sources")
+  # -------------------------------------------------------
+  {{- if $appConfig.sources }}
+  sources:
+    {{- range $appConfig.sources }}
+    - repoURL: {{ include "cluster-core.render" (dict "val" .repoURL "context" $) }}
+      targetRevision: {{ include "cluster-core.render" (dict "val" .targetRevision "context" $) }}
+      {{- if .chart }}
+      chart: {{ .chart }}
+      {{- end }}
+      {{- if .path }}
+      path: {{ include "cluster-core.render" (dict "val" .path "context" $) }}
+      {{- end }}
+      {{- if .ref }}
+      ref: {{ .ref }}
+      {{- end }}
+      {{- if .helm }}
+      helm:
+        {{- if .helm.valueFiles }}
+        valueFiles:
+          {{- range .helm.valueFiles }}
+          - {{ include "cluster-core.render" (dict "val" . "context" $) }}
+          {{- end }}
+        {{- end }}
+        {{- if .helm.values }}
+        values: |
+          {{- include "cluster-core.render" (dict "val" .helm.values "context" $) | nindent 10 }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- else }}
+  source:
+    repoURL: {{ include "cluster-core.render" (dict "val" $appConfig.source.repoURL "context" $) }}
+    targetRevision: {{ include "cluster-core.render" (dict "val" $appConfig.source.targetRevision "context" $) }}
+    path: {{ include "cluster-core.render" (dict "val" $appConfig.source.path "context" $) }}
+    {{- if $appConfig.source.directory }}
+    directory:
+      {{- toYaml $appConfig.source.directory | nindent 6 }}
+    {{- end }}
+  {{- end }}
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    {{- if $appConfig.syncOptions }}
+    syncOptions:
+      {{- toYaml $appConfig.syncOptions | nindent 6 }}
+    {{- end }}
+{{- end }}
+{{- end }}

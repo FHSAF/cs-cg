@@ -9,7 +9,6 @@ spec:
   generators:
     - list:
         elements:
-          
           - name: example-app1
           - name: example-app2
           - name: example-app3
@@ -22,7 +21,7 @@ spec:
       source:
         repoURL: "https://github.com/FHSAF/cs-cg.git"
         targetRevision: dev
-        path: charts/example-apps
+        path: charts/ms
         helm:
           valueFiles:
             - ../../clusters/k3s/dev/values/example-appsets-values.yaml

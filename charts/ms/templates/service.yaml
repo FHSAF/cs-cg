@@ -1,0 +1,19 @@
+{{- $configJson := include "mychart.getConfig" . -}}
+{{- $config := $configJson | fromJson -}}
+---
+{{- if $config.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ $config.service.port }}
+      targetPort: {{ $config.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Release.Name }}
+{{- end }}

@@ -1,0 +1,107 @@
+global:
+  domain: argocd.example.com
+
+# 1. High Availability & Persistence (Requires CSI to be running)
+controller:
+  replicas: 1 # Keep at 1 unless managing thousands of apps
+  resources:
+    limits:
+      cpu: 1
+      memory: 2048Mi
+    requests:
+      cpu: 500m
+      memory: 1024Mi
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: kps 
+
+server:
+  replicas: 2
+  resources:
+    limits:
+      cpu: 1
+      memory: 1024Mi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  pdb:
+    enabled: true
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: kps
+
+repoServer:
+  replicas: 2
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1024Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  pdb:
+    enabled: true
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: kps
+
+# 2. Redis HA (Production Cache)
+redis:
+  enabled: false
+redis-ha:
+  hardAntiAffinity: false
+  # resources:
+  #   limits:
+  #     cpu: 500m
+  #     memory: 1024Mi
+  #   requests:
+  #     cpu: 100m
+  #     memory: 256Mi
+  enabled: true
+  persistentVolume:
+    enabled: true
+    storageClass: local-path
+    size: 10Gi
+  haproxy:
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        additionalLabels:
+          release: kps
+    hardAntiAffinity: false
+
+# 3. Production Configs (OIDC & RBAC)
+configs:
+  cm:
+    url: "https://argocd.example.com"
+    # OIDC Configuration
+    oidc.config: |
+      name: authentik
+      issuer: https://auth.example.com/application/o/argocd-example-com/
+      clientID: ubNzLpSYTXHI1fbMjpAZGjf2mim69iiCnzUSmoYl
+      clientSecret: $argocd-oidc-creds:oidc.clientSecret
+      requestedScopes: ["openid", "profile", "email", "groups"]
+  
+  # RBAC Policies
+  rbac:
+    policy.csv: |
+      g, example-com-argocd-cluster-admins, role:admin
+      g, example-com-argocd-readonly-group, role:readonly
+
+  # 4. Monitoring Rules (Alerts)
+  # This creates PrometheusRules for firing alerts on Sync failures
+  metrics:
+    rules:
+      enabled: true
+      additionalLabels:
+        release: kps

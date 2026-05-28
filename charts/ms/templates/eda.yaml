@@ -1,0 +1,123 @@
+{{- $configJson := include "mychart.getConfig" . -}}
+{{- $config := $configJson | fromJson -}}
+{{- if and $config.keda $config.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ .Release.Name }}-{{ $config.keda.nameOverride | default "scaledobject" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  # --- Scale Target ---
+  # Reference to the deployment that KEDA will scale.
+  scaleTargetRef:
+    apiVersion:    apps/v1
+    kind:          Deployment
+    name:          {{ .Release.Name }}
+    # KEDA will read connection env vars from this container.
+    # If not specified, it defaults to the first container in the pod spec.
+    envSourceContainerName: {{ $config.keda.envSourceContainerName | default .Release.Name }}
+
+  # --- Scaling Parameters ---
+  # How often KEDA should check the trigger source (in seconds).
+  pollingInterval: {{ $config.keda.pollingInterval | default 30 }}
+  # The period to wait before scaling down to zero replicas.
+  cooldownPeriod:  {{ $config.keda.cooldownPeriod | default 300 }}
+  # Minimum number of replicas to scale down to. Can be 0.
+  minReplicaCount: {{ $config.keda.minReplicaCount | default 1 }}
+  # Maximum number of replicas to scale up to.
+  maxReplicaCount: {{ $config.keda.maxReplicaCount | default 10 }}
+
+  # --- Advanced HPA Configuration ---
+  # This section gives fine-grained control over the HPA's scaling behavior.
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: {{ $config.keda.advanced.hpa.scaleDown.stabilizationWindowSeconds | default 300 }}
+          policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 60
+        scaleUp:
+          stabilizationWindowSeconds: {{ $config.keda.advanced.hpa.scaleUp.stabilizationWindowSeconds | default 0 }}
+          policies:
+          - type: Pods
+            value: 4
+            periodSeconds: 15
+          - type: Percent
+            value: 200
+            periodSeconds: 15
+
+  # --- Trigger Configuration ---
+  # This defines what metric KEDA should use to scale.
+  triggers:
+  # RabbitMQ Queue Length Trigger
+  {{- if and $config.keda.triggers.rabbitmq $config.keda.triggers.rabbitmq.enabled }}
+  - type: rabbitmq
+    metadata:
+      # --- Trigger Specifics ---
+      # The name of the queue to monitor.
+      queueName: {{ required "A queueName is required!" $config.keda.triggers.rabbitmq.queueName }}
+      # Scaling mode: QueueLength (based on message count) or MessageRate (based on consumer speed).
+      mode: {{ $config.keda.triggers.rabbitmq.mode | default "QueueLength" }}
+      # The target value that triggers scaling. For QueueLength, it's the number of messages per replica.
+      # The value is a string. For example, a value of "50" means "scale up if messages > 50 * replica_count".
+      value: "{{ $config.keda.triggers.rabbitmq.value | default 50 }}"
+      
+      # unsafeSsl: "true"
+      # Protocol for connecting to RabbitMQ. 'amqp' is standard. 'http' uses the management API.
+    #   protocol: {{ $config.keda.triggers.rabbitmq.protocol | default "amqp" }}
+
+      # --- Connection from Environment Variables ---
+      # These parameters instruct KEDA to get connection details from environment variables
+      # defined in the target deployment's container (`envSourceContainerName`).
+      # This is the recommended approach for handling credentials.
+      hostFromEnv: RABBITMQ_HOST_EDA     # Name of the env var for the AMQP connection string, e.g., "amqp://user:pass@host:5672"
+      usernameFromEnv: RABBITMQ_USER     # Optional: env var for username if not in host string
+      passwordFromEnv: RABBITMQ_PASSWORD # Optional: env var for password if not in host string
+    #   vhostName: {{ $config.keda.triggers.rabbitmq.vhostName | default "/" }}
+  # Message Rate Trigger
+  {{- if and $config.keda.triggers.rabbitmq.messageRateEnabled $config.keda.triggers.rabbitmq.messageRateEnabled }}
+  - type: rabbitmq
+    metadata:
+      # --- Trigger Specifics ---
+      # The name of the queue to monitor.
+      queueName: {{ required "A queueName is required!" $config.keda.triggers.rabbitmq.queueName }}
+      # Scaling mode: QueueLength (based on message count) or MessageRate (based on consumer speed).
+      mode: "MessageRate"
+      # The target value that triggers scaling. For QueueLength, it's the number of messages per replica.
+      # The value is a string. For example, a value of "50" means "scale up if messages > 50 * replica_count".
+      value: "{{ $config.keda.triggers.rabbitmq.messageRateValue | default 50 }}"
+      
+      # unsafeSsl: "true"
+      # Protocol for connecting to RabbitMQ. 'amqp' is standard. 'http' uses the management API.
+    #   protocol: {{ $config.keda.triggers.rabbitmq.protocol | default "amqp" }}
+
+      # --- Connection from Environment Variables ---
+      # These parameters instruct KEDA to get connection details from environment variables
+      # defined in the target deployment's container (`envSourceContainerName`).
+      # This is the recommended approach for handling credentials.
+      hostFromEnv: RABBITMQ_HOST_EDA     # Name of the env var for the AMQP connection string, e.g., "amqp://user:pass@host:5672"
+      usernameFromEnv: RABBITMQ_USER     # Optional: env var for username if not in host string
+      passwordFromEnv: RABBITMQ_PASSWORD # Optional: env var for password if not in host string
+    #   vhostName: {{ $config.keda.triggers.rabbitmq.vhostName | default "/" }}
+  {{- end }}
+  {{- end }}
+  {{- if and $config.keda.triggers.cpu $config.keda.triggers.cpu.enabled }}
+  - type: cpu
+    metricType: {{ $config.keda.triggers.cpu.metricType | default "Utilization" }}
+    metadata:
+      # Target CPU utilization percentage to trigger scaling.
+      value: "{{ $config.keda.triggers.cpu.metadata.value | default 80 }}"
+  {{- end }}
+  {{- if and $config.keda.triggers.memory $config.keda.triggers.memory.enabled }}
+  - type: memory
+    metricType: {{ $config.keda.triggers.memory.metricType | default "Utilization" }}
+    metadata:
+      # Target Memory utilization percentage to trigger scaling.
+      value: "{{ $config.keda.triggers.memory.metadata.value | default 80 }}"
+  {{- end }}
+{{- end }}

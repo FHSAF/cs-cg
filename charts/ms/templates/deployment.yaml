@@ -1,0 +1,155 @@
+{{- $configJson := include "mychart.getConfig" . -}}
+{{- $config := $configJson | fromJson -}}
+{{- $platformRelease := $config.platformRelease | default dict -}}
+{{- $platformVersion := index $platformRelease "version" | default "" -}}
+{{- $platformChannel := index $platformRelease "channel" | default "" -}}
+{{- $resolvedImageTag := include "mychart.resolvePlatformTag" (dict "tag" $config.image.tag "platformVersion" $platformVersion "channel" $platformChannel) -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  {{- if $platformVersion }}
+  annotations:
+    project.tecomon.net/platform-version: {{ $platformVersion | quote }}
+    project.tecomon.net/release-channel: {{ $platformChannel | quote }}
+  {{- end }}
+  {{if $config.labels }}
+  labels:
+    {{- toYaml $config.labels | nindent 4 }}
+  {{- end }}
+spec:
+  # only if keda is not enabled, otherwise HPA will manage replicas
+  {{- if not (and $config.keda $config.keda.enabled) }}
+  replicas: {{ $config.replicaCount }}
+  {{- end }}
+  {{- with $config.deploymentStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  revisionHistoryLimit: {{ $config.revisionHistoryLimit | default 2 }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      {{- with $config.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: {{ .Release.Name }}
+        {{- if $config.labels }}
+        {{- toYaml $config.labels | nindent 8 }}
+        {{- end }}
+    spec:
+      # ==========================================================
+      # Initialization Containers Block
+      # ==========================================================
+      {{- if $config.initContainers }}
+      initContainers:
+      {{- range $container := $config.initContainers }}
+      - name: {{ $container.name }}
+        {{- if and (eq $container.name "seed-assets") $config.supportingImages $config.supportingImages.projectLibpostal $config.supportingImages.projectLibpostal.image $config.supportingImages.projectLibpostal.image.repository $config.supportingImages.projectLibpostal.image.tag }}
+        image: {{ include "mychart.supportingImageRef" (dict "repository" $config.supportingImages.projectLibpostal.image.repository "tag" $config.supportingImages.projectLibpostal.image.tag "platformVersion" $platformVersion "channel" $platformChannel) | quote }}
+        {{- else if $container.image }}
+        image: {{ $container.image | quote }}
+        {{- end }}
+        {{- with (omit $container "name" "image") }}
+{{ toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
+      # ==========================================================
+      # Main Containers Block
+      # ==========================================================
+      {{- with $config.image.pullSecret }}
+      imagePullSecrets:
+      - name: {{ . }}
+      {{- end }}
+      {{- if $config.serviceAccount.create }}
+      serviceAccountName: {{ $config.serviceAccount.name | default .Release.Name }}
+      {{- end }}
+      containers:
+      - name: {{ .Release.Name }}
+        image: "{{ $config.image.repositoryBase }}{{ $config.image.imageName }}:{{ $resolvedImageTag }}"
+        imagePullPolicy: {{ $config.image.pullPolicy | default "IfNotPresent" }}
+        {{- with $config.command }}
+        command:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if $config.service.enabled }}
+        ports:
+        - name: http
+          containerPort: {{ $config.service.targetPort }}
+        {{- end }}
+        
+        # --- Health Probes ---
+        {{- if $config.probes }}
+        {{- with $config.probes.liveness }}
+        livenessProbe:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with $config.probes.readiness }}
+        readinessProbe:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- end }}
+
+        # ==========================================================
+        # DYNAMIC ENVIRONMENT VARIABLES BLOCK
+        # ==========================================================
+        {{- include "mychart.environmentVariables" (dict "Values" $config "Release" .Release) | nindent 8 }}
+
+        # --- Resources ---
+        {{- with $config.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        # --- Volume Mounts ---
+        {{- if $config.volumeMounts }}
+        volumeMounts:
+        {{- toYaml $config.volumeMounts | nindent 10 }}
+        {{- end }}
+      # ==========================================================
+      # Extra (Sidecar) Containers Block
+      # ==========================================================
+      {{- if $config.extraContainers }}
+      {{- range $config.extraContainers }}
+      - name: {{ .name }}
+        {{- if .inheritMainImage }}
+        image: "{{ $config.image.repositoryBase }}{{ $config.image.imageName }}:{{ $resolvedImageTag }}"
+        imagePullPolicy: {{ $config.image.pullPolicy | default "IfNotPresent" }}
+        {{- else }}
+        image: {{ .image | quote }}
+        {{- with .imagePullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
+        {{- end }}
+        {{- with .command }}
+        command:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if .inheritEnvFromMain }}
+        {{- include "mychart.environmentVariables" (dict "Values" $config "Release" $.Release) | nindent 8 }}
+        {{- else }}
+        {{- with .env }}
+        env:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- end }}
+        {{- with .resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .volumeMounts }}
+        volumeMounts:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
+      # --- Volumes ---
+      {{- if $config.volumes }}
+      volumes:
+      {{- toYaml $config.volumes | nindent 8 }}
+      {{- end }}

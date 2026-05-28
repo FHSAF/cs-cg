@@ -1,0 +1,34 @@
+# TEST 05 – Escape hatch: fully custom sources list
+# Uses the top-level `sources` key to completely override auto-generated sources.
+# Verifies: ONLY the listed sources appear; no auto-injected ref source.
+projectName: test-cluster
+repoURL: https://github.com/example/repo.git
+targetRevision: main
+destinationServer: https://kubernetes.default.svc
+environment: test
+
+apps:
+  vault:
+    enabled: true
+    namespace: vault
+    project: default
+    syncWave: 9
+    # Full override – no auto-generation takes place
+    sources:
+      - repoURL: https://helm.releases.hashicorp.com
+        targetRevision: 0.32.0
+        chart: vault
+        helm:
+          valueFiles:
+            - "$values/clusters/test-cluster/test/values/opensource-services/vault-values.yaml"
+            - "$values/clusters/test-cluster/test/values/opensource-services/vault-override.yaml"
+      - repoURL: https://github.com/example/repo.git
+        targetRevision: main
+        ref: values
+    syncOptions:
+      - CreateNamespace=true
+    ignoreDifferences:
+      - group: admissionregistration.k8s.io
+        kind: MutatingWebhookConfiguration
+        jsonPointers:
+          - /webhooks/0/clientConfig/caBundle

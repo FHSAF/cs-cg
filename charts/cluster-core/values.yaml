@@ -1,0 +1,411 @@
+# ==========================================================
+# Global Cluster Configuration
+# ==========================================================
+clusterName: internal
+# The base URL for your GitOps repo
+repoURL: https://github.com/FHSAF/cs-cg.git
+# The revision to track (HEAD, main, v1.0, etc.)
+targetRevision: main
+# Where these Application resources (the "App of Apps") live
+destinationServer: https://kubernetes.default.svc
+
+# ==========================================================
+# 1. Projects & RBAC Configuration
+# ==========================================================
+projects:
+  # --------------------------------------------------------
+  # DEV PROJECT
+  # --------------------------------------------------------
+  - name: argocd-dev-project
+    enabled: false  # Toggle to false to exclude this project entirely
+    description: "Development environment resources"
+    destinations:
+      - namespace: dev
+        server: https://kubernetes.default.svc
+      - namespace: monitoring
+        server: https://kubernetes.default.svc
+      - namespace: argocd
+        server: https://kubernetes.default.svc
+    
+    # Simplified Role Management
+    roles:
+      # Role 1: Admins (Name matches Group Name)
+      - name: "project-stage-argocd-admins"
+        description: "Full Admin access for project Stage Team"
+        # These policies generate the complex CSV lines automatically
+        policies:
+          - resources: ["applications", "applicationsets", "repositories", "logs", "exec"]
+            verbs: ["*"]
+            objects: ["*"]  # Matches all apps in this project
+
+      # Role 2: Viewers
+      - name: "project-stage-argocd-viewers"
+        description: "Read-only access"
+        policies:
+          - resources: ["applications", "logs"]
+            verbs: ["get", "list"]
+            objects: ["*"]
+
+      # Role 3: Specific App Developer (Restricted)
+      - name: "cat-iwa-pindot-dev"
+        description: "Access to specific apps only"
+        policies:
+          - resources: ["applications", "logs"]
+            verbs: ["get", "sync"]
+            # Only allows access to applications named 'dev-cat-iwa-pindot'
+            objects: ["dev-cat-iwa-pindot"]
+
+  # --------------------------------------------------------
+  # STAGE PROJECT
+  # --------------------------------------------------------
+  - name: argocd-stage-project
+    enabled: false
+    description: "Stage environment resources"
+    destinations:
+      - namespace: stage
+        server: https://kubernetes.default.svc
+    roles:
+      - name: "project-stage-argocd-admins"
+        policies:
+          - resources: ["*"]
+            verbs: ["*"]
+            objects: ["*"]
+
+# ==========================================================
+# Core Applications
+# ==========================================================
+# Keys become the Application name.
+# You can enable/disable them per environment.
+apps:
+  
+  # --------------------------------------------------------
+  # Cert Manager (Helm Chart + Git Values)
+  # --------------------------------------------------------
+  cert-manager:
+    enabled: false
+    namespace: cert-manager
+    syncWave: "0"
+    project: default
+    # Uses ArgoCD "Multiple Sources" pattern
+    sources:
+      - repoURL: https://charts.jetstack.io
+        chart: cert-manager
+        targetRevision: v1.20.2 # pinned on 11.05.2026
+        helm:
+          # Inline values example
+          valueFiles:
+            - $values/clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/00-cert-manager-values.yaml
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        ref: values
+    syncOptions:
+      - CreateNamespace=true
+  
+  # --------------------------------------------------------
+  # Local Path Provisioner
+  # --------------------------------------------------------
+  local-path-provisioner:
+    enabled: false
+    namespace: local-path-storage
+    syncWave: "2"
+    project: default
+    sources:
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        ref: values
+      - repoURL: 'https://charts.containeroo.ch'
+        chart: local-path-provisioner
+        targetRevision: 0.0.37 # pinned on 12.05.2026
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/00-local-path-provisioner-values.yaml
+    syncOptions:
+      - CreateNamespace=true
+  # --------------------------------------------------------
+  # Trust Manager (Helm Chart + Git Values)
+  # --------------------------------------------------------
+  trust-manager:
+    enabled: false
+    namespace: trust-manager
+    syncWave: "0"
+    project: default
+    sources:
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        ref: values
+      - repoURL: https://charts.jetstack.io
+        chart: trust-manager
+        targetRevision: v0.21.1 # pinned on 03.03.2026
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/00-trust-manager-values.yaml
+    syncOptions:
+      - CreateNamespace=true
+  # --------------------------------------------------------
+  # Ingress Nginx (Helm Chart + Git Value File)
+  # --------------------------------------------------------
+  ingress-nginx:
+    enabled: false
+    namespace: ingress-nginx
+    syncWave: "1"
+    project: default
+    sources:
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        ref: values
+      - repoURL: https://kubernetes.github.io/ingress-nginx
+        chart: ingress-nginx
+        targetRevision: 4.15.1
+        helm:
+          valueFiles:
+            # Dynamic path based on clusterName
+            - $values/clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/01-ingress-nginx-values.yaml
+    syncOptions:
+      - CreateNamespace=true
+  
+  # --------------------------------------------------------
+  # Nginx Ingress (Helm Chart + Git Value File)
+  # --------------------------------------------------------
+  nginx-ingress:
+    enabled: false
+    namespace: nginx-ingress
+    syncWave: "1"
+    project: default
+    sources:
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        ref: values
+      - repoURL: oci://ghcr.io/nginx/charts/nginx-ingress
+        path: .
+        targetRevision: 2.5.2 # pinned on 12.05.2026
+        helm:
+          valueFiles:
+            # Dynamic path based on clusterName and namespace
+            - $values/clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/01-nginx-ingress-values.yaml
+    syncOptions:
+      - CreateNamespace=true
+  
+  # --------------------------------------------------------
+  # Traefik Ingress (Helm Chart + Git Value File)
+  # --------------------------------------------------------
+  traefik:
+    enabled: false
+    namespace: traefik
+    syncWave: "1"
+    project: default
+    sources:
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        ref: values
+      - repoURL: oci://ghcr.io/traefik/helm/traefik
+        path: .
+        targetRevision: 40.1.0 # pinned on 12.05.2026
+        helm:
+          valueFiles:
+            # Dynamic path based on clusterName and namespace
+            - $values/clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/01-traefik-values.yaml
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # OAuth2-Proxy for Traefik Authentication (Helm Chart + Git Value File)
+  # --------------------------------------------------------
+  oauth2-proxy:
+    enabled: false
+    namespace: traefik
+    syncWave: "2"
+    project: default
+    sources:
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        ref: values
+      - repoURL: https://oauth2-proxy.github.io/manifests
+        chart: oauth2-proxy
+        targetRevision: 10.4.3 # pinned on 24.04.2026
+        helm:
+          valueFiles:
+            # Dynamic path based on clusterName and namespace
+            - $values/clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/02-oauth2-proxy-values.yaml
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # Metrics Server
+  # --------------------------------------------------------
+  metrics-server:
+    enabled: false
+    namespace: kube-system
+    syncWave: "1"
+    project: default
+    sources:
+      - repoURL: https://kubernetes-sigs.github.io/metrics-server/
+        chart: metrics-server
+        targetRevision: 3.13.0 # pinned on 03.03.2026
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/01-metrics-server-values.yaml
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        ref: values
+  # --------------------------------------------------------
+  # Reflector
+  # --------------------------------------------------------
+  reflector:
+    enabled: false
+    namespace: reflector
+    syncWave: "1"
+    project: default
+    sources:
+      - repoURL: https://emberstack.github.io/helm-charts
+        chart: reflector
+        targetRevision: "10.0.41" # pinned on 12.05.2026
+    syncOptions:
+      - CreateNamespace=true
+  
+  # --------------------------------------------------------
+  # Cert Manger Webhook Hetzner from https://charts.hetzner.cloud
+  # --------------------------------------------------------
+  cmwh:
+    enabled: false
+    namespace: cert-manager
+    syncWave: "2"
+    project: default
+    sources:
+      - repoURL: https://charts.hetzner.cloud
+        chart: cert-manager-webhook-hetzner
+        targetRevision: 0.7.0 # pinned on 12.05.2026
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/02-cmwh-values.yaml
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        ref: values
+    syncOptions:
+      - CreateNamespace=true
+  # --------------------------------------------------------
+  # ArgoCD Instance
+  # --------------------------------------------------------
+  argocd:
+    enabled: false
+    namespace: argocd
+    syncWave: "3"
+    project: default
+    sources:
+      - repoURL: 'https://argoproj.github.io/argo-helm'
+        chart: argo-cd
+        targetRevision: 9.5.6 # pinned on 28.04.2026
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/03-argocd-values.yaml
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        ref: values
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        path: clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/argocd-expose
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  # --------------------------------------------------------
+  # Argocd Image Updater
+  # --------------------------------------------------------
+  argocd-image-updater:
+    enabled: false
+    namespace: argocd
+    syncWave: "3"
+    project: default
+    sources:
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        ref: values
+      - repoURL: https://argoproj.github.io/argo-helm
+        chart: argocd-image-updater
+        targetRevision: 1.1.5 # pinned on 28.04.2026
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/03-argocd-image-updater-values.yaml
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # Tenant Application (Folder based)
+  # --------------------------------------------------------
+  tenant-application:
+    enabled: false
+    namespace: tenant
+    syncWave: "5"
+    project: default
+    source:
+      repoURL: '{{ .Values.repoURL }}'
+      targetRevision: HEAD
+      path: clusters/{{ .Values.clusterName }}/_core/tenant
+      directory:
+        recurse: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+
+  # --------------------------------------------------------
+  # Custom Error Pages (local Helm chart)
+  # --------------------------------------------------------
+  error-pages:
+    enabled: false
+    namespace: ingress-utils
+    syncWave: "2"
+    project: default
+    sources:
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        ref: values
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        path: charts/error-pages
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/error-pages-values.yaml
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # CoreDNS (Official Helm Chart)
+  # https://coredns.github.io/helm
+  # --------------------------------------------------------
+  coredns:
+    enabled: false
+    namespace: kube-system
+    syncWave: "0"
+    project: default
+    sources:
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        ref: values
+      - repoURL: https://coredns.github.io/helm
+        chart: coredns
+        targetRevision: 1.45.2 # pinned on 03.03.2026
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/00-coredns-values.yaml
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # Cilium CNI (Official Helm Chart)
+  # https://helm.cilium.io/
+  # --------------------------------------------------------
+  cilium:
+    enabled: false
+    namespace: kube-system
+    syncWave: "-1"
+    project: default
+    sources:
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        ref: values
+      - repoURL: https://helm.cilium.io/
+        chart: cilium
+        targetRevision: 1.19.3 # pinned on 12.05.2026
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.clusterName }}/_core/values/{{ .Values.namespace }}/00-cilium-values.yaml
+    syncOptions:
+      - CreateNamespace=true

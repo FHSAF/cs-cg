@@ -1,0 +1,763 @@
+# ==========================================================
+# Global Cluster Configuration
+# ==========================================================
+projectName: internal
+# The base URL for your GitOps repo
+repoURL: https://github.com/FHSAF/cs-cg.git
+# The revision to track (HEAD, main, v1.0, etc.)
+targetRevision: main
+# Where these Application resources (the "App of Apps") live
+destinationServer: https://kubernetes.default.svc
+environment: dev
+
+# Convention value-file path for every app:
+#   $values/clusters/<projectName>/<environment>/values/opensource-services/<appName>-values.yaml
+
+# ==========================================================
+# How sources work (DRY design reference)
+# ==========================================================
+#
+# Each app supports three modes (highest priority first):
+#
+# ① sources  — escape hatch: a fully-custom list rendered verbatim.
+#              Use this only when the standard pattern cannot express
+#              what you need.
+#
+# ② chart    — DEFAULT / DRY pattern. The template auto-generates:
+#                (a) Helm chart source
+#                      chart.repoURL / chart.targetRevision / chart.name
+#                      valueFiles  → defaults to convention path when absent:
+#                        $values/clusters/<projectName>/<environment>/
+#                                         values/opensource-services/<appName>-values.yaml
+#                      extraValueFiles → appended after main valueFiles
+#                      values / parameters → optional
+#                (b) Values-ref source (ref: values)
+#                      always injected; enables $values in valueFiles paths
+#                (c) extraPath  → selfRepo path source, ONLY emitted when set
+#                      points to $.Values.repoURL / $.Values.targetRevision
+#                      omit or set to "" to skip entirely (good for e.g. addons)
+#                (d) extraSources → list of fully-custom additional sources
+#                      appended after (a)/(b)/(c); any schema supported
+#
+# ③ source   — legacy single-source for plain path/directory apps
+#
+# ==========================================================
+
+# ==========================================================
+# 1. Projects & RBAC Configuration
+# ==========================================================
+projects:
+  # --------------------------------------------------------
+  # DEV PROJECT
+  # --------------------------------------------------------
+  - name: argocd-dev-project
+    enabled: false
+    description: "Development environment resources"
+    destinations:
+      - namespace: dev
+        server: https://kubernetes.default.svc
+      - namespace: monitoring
+        server: https://kubernetes.default.svc
+      - namespace: argocd
+        server: https://kubernetes.default.svc
+
+    roles:
+      - name: "project-stage-argocd-admins"
+        description: "Full Admin access for project Stage Team"
+        policies:
+          - resources: ["applications", "applicationsets", "repositories", "logs", "exec"]
+            verbs: ["*"]
+            objects: ["*"]
+
+      - name: "project-stage-argocd-viewers"
+        description: "Read-only access"
+        policies:
+          - resources: ["applications", "logs"]
+            verbs: ["get", "list"]
+            objects: ["*"]
+
+      - name: "cat-iwa-pindot-dev"
+        description: "Access to specific apps only"
+        policies:
+          - resources: ["applications", "logs"]
+            verbs: ["get", "sync"]
+            objects: ["dev-cat-iwa-pindot"]
+
+# ==========================================================
+# Core Applications
+# ==========================================================
+# Keys become the Application name.
+# Disable globally here; each cluster overrides only what it needs.
+#
+# Minimal per-app override (in a cluster values file):
+#   apps:
+#     valkey:
+#       enabled: true
+#
+# All chart metadata lives here as the single source of truth.
+# ==========================================================
+apps:
+
+  # --------------------------------------------------------
+  # 1. VALKEY
+  # --------------------------------------------------------
+  valkey:
+    enabled: false
+    namespace: valkey
+    project: default
+    syncWave: 10
+    valuesDir: valkey
+    chart:
+      repoURL: https://valkey.io/valkey-helm/
+      targetRevision: 0.9.3
+      name: valkey
+      # valueFiles: []          # omit → uses convention path automatically
+      # extraValueFiles: []     # append extra value files after convention path
+      # values: {}              # inline helm values
+      # parameters: []          # helm parameter overrides
+    # extraPath: ""             # selfRepo path source — emitted only when set
+    # extraSources: []          # additional fully-custom sources
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 2. KUBE-PROMETHEUS-STACK
+  # --------------------------------------------------------
+  kps:
+    enabled: false
+    namespace: monitoring
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: ghcr.io/prometheus-community/charts
+      targetRevision: 83.4.2 # pinned on 15.04.2026
+      name: kube-prometheus-stack
+    # extraPath: set per cluster, e.g. "clusters/<projectName>/<environment>/values/kube-prometheus-stack"
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+
+  # --------------------------------------------------------
+  # 3. LOKI
+  # --------------------------------------------------------
+  loki:
+    enabled: false
+    namespace: monitoring
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: https://grafana-community.github.io/helm-charts
+      targetRevision: 12.0.0 # pinned on 15.04.2026
+      # repoURL: https://grafana.github.io/helm-charts
+      # targetRevision: 6.53.0
+      name: loki
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 4. ALLOY
+  # --------------------------------------------------------
+  alloy:
+    enabled: false
+    namespace: monitoring
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: https://grafana.github.io/helm-charts
+      targetRevision: 1.7.0 # pinned on 15.04.2026
+      name: alloy
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 5. TEMPO
+  # --------------------------------------------------------
+  tempo:
+    enabled: false
+    namespace: monitoring
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: https://grafana-community.github.io/helm-charts
+      targetRevision: 2.0.0 # pinned on 15.04.2026
+      name: tempo
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 6. THANOS
+  # --------------------------------------------------------
+  thanos:
+    enabled: false
+    namespace: monitoring
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: ghcr.io/thanos-community/helm-charts
+      targetRevision: 0.3.4 # pinned on 15.04.2026
+      name: thanos
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 7. MIMIR
+  # --------------------------------------------------------
+  mimir:
+    enabled: false
+    namespace: monitoring
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: https://grafana.github.io/helm-charts
+      targetRevision: 1.5.2
+      name: mimir
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 8. AUTHENTIK
+  # --------------------------------------------------------
+  authentik:
+    enabled: false
+    namespace: authentik
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: https://charts.goauthentik.io
+      targetRevision: 2026.5.0
+      name: authentik
+    syncOptions:
+      - CreateNamespace=true
+  # --------------------------------------------------------
+  # 8a. AUTHENTIK
+  # --------------------------------------------------------
+  ak:
+    enabled: false
+    namespace: ak
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: https://charts.goauthentik.io
+      targetRevision: 2026.5.0
+      name: authentik
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 9. VAULT
+  # --------------------------------------------------------
+  vault:
+    enabled: false
+    namespace: vault
+    project: default
+    syncWave: 9
+    chart:
+      repoURL: https://helm.releases.hashicorp.com
+      targetRevision: 0.32.0
+      name: vault
+    syncOptions:
+      - CreateNamespace=true
+    ignoreDifferences:
+      - group: admissionregistration.k8s.io
+        kind: MutatingWebhookConfiguration
+        jsonPointers:
+          - /webhooks/0/clientConfig/caBundle
+
+  # --------------------------------------------------------
+  # 10. VAULT-SECRETS-OPERATOR
+  # --------------------------------------------------------
+  vso:
+    enabled: false
+    namespace: vso
+    project: default
+    syncWave: 9
+    chart:
+      repoURL: https://helm.releases.hashicorp.com
+      targetRevision: 1.3.0
+      name: vault-secrets-operator
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 11. JITSI
+  # --------------------------------------------------------
+  jitsi:
+    enabled: false
+    namespace: jitsi
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: https://jitsi-contrib.github.io/jitsi-helm
+      targetRevision: 2.0.2
+      name: jitsi-meet
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 12. WORKADVENTURE
+  # --------------------------------------------------------
+  wa:
+    enabled: false
+    namespace: wa
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: https://charts.workadventu.re
+      targetRevision: "1.27.6"
+      name: workadventure
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 13. UPTIME-KUMA
+  # --------------------------------------------------------
+  uptime-kuma:
+    enabled: false
+    namespace: status
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: https://dirsigler.github.io/uptime-kuma-helm
+      targetRevision: 4.0.0
+      name: uptime-kuma
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    # StatefulSet VolumeClaimTemplates are immutable; suppress the diff globally.
+    ignoreDifferences:
+      - group: apps
+        kind: StatefulSet
+        name: uptime-kuma
+        jqPathExpressions:
+          - .spec.volumeClaimTemplates[]?.apiVersion
+          - .spec.volumeClaimTemplates[]?.kind
+
+  # --------------------------------------------------------
+  # 14. CLOUDNATIVE-PG OPERATOR
+  # --------------------------------------------------------
+  # Uses `sources` (escape hatch) because the Application deploys two independent
+  # Helm charts (cloudnative-pg + plugin-barman-cloud) in a single ArgoCD app.
+  cnpg:
+    enabled: false
+    namespace: cnpg-system
+    project: default
+    syncWave: 10
+    sources:
+      - repoURL: https://cloudnative-pg.github.io/charts
+        targetRevision: 0.27.1
+        chart: cloudnative-pg
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/opensource-services/cnpg-values.yaml
+      - repoURL: https://cloudnative-pg.github.io/charts
+        targetRevision: 0.5.0
+        chart: plugin-barman-cloud
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/opensource-services/cnpg-barman-values.yaml
+      - repoURL: "{{ .Values.repoURL }}"
+        targetRevision: "{{ .Values.targetRevision }}"
+        ref: values
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+
+  # --------------------------------------------------------
+  # 15. PERCONA XtraDB CLUSTER OPERATOR (PXC)
+  # --------------------------------------------------------
+  pxc-operator:
+    enabled: false
+    namespace: mysql-operator
+    project: default
+    syncWave: 30
+    chart:
+      repoURL: https://percona.github.io/percona-helm-charts/
+      targetRevision: 1.19.0
+      name: pxc-operator
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 16. HARBOR
+  # --------------------------------------------------------
+  # Uses `sources` escape hatch: three sources are required (helm chart +
+  # values-ref at HEAD + addons path), which cannot be expressed with chart:.
+  harbor:
+    enabled: false
+    namespace: harbor
+    project: default
+    syncWave: 20
+    sources:
+      - repoURL: https://helm.goharbor.io
+        targetRevision: 1.18.0
+        chart: harbor
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/opensource-services/harbor-values.yaml
+      - repoURL: "{{ .Values.repoURL }}"
+        targetRevision: HEAD
+        ref: values
+      - repoURL: "{{ .Values.repoURL }}"
+        targetRevision: "{{ .Values.targetRevision }}"
+        path: clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/harbor
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    # harbor-database StatefulSet volumeClaimTemplates are immutable.
+    ignoreDifferences:
+      - group: apps
+        kind: StatefulSet
+        jsonPointers:
+          - /spec/volumeClaimTemplates
+  # --------------------------------------------------------
+  # 17. AIRFLOW (Apache official)
+  # --------------------------------------------------------
+  airflow:
+    enabled: false
+    namespace: airflow
+    project: default
+    syncWave: 20
+    chart:
+      repoURL: https://airflow.apache.org
+      targetRevision: 1.19.0
+      name: airflow
+    syncOptions:
+      - CreateNamespace=true
+  # ---------------------------------------------------------
+  # 18. Outline 
+  # ---------------------------------------------------------
+  outline:
+    enabled: false
+    namespace: outline
+    project: default
+    syncWave: 20
+    localChart:
+      path: charts/outline
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 19. FLOWISE (cowboysysop chart)
+  # --------------------------------------------------------
+
+  flowise:
+    enabled: false
+    namespace: flowise
+    project: default
+    syncWave: 20
+    chart:
+      repoURL: https://cowboysysop.github.io/charts/
+      targetRevision: 6.0.0
+      name: flowise
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 20. SUPERSET (Apache official)
+  # --------------------------------------------------------
+  superset:
+    enabled: false
+    namespace: superset
+    project: default
+    syncWave: 20
+    chart:
+      repoURL: http://apache.github.io/superset/
+      targetRevision: 0.15.2
+      name: superset
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 21. CREDENTIAL BROKER PLATFORM
+  # --------------------------------------------------------
+  credential-broker:
+    enabled: false
+    namespace: credential-broker
+    project: default
+    syncWave: 21
+    localChart:
+      path: charts/credential-broker-platform
+    syncOptions:
+      - ServerSideApply=true
+
+  # --------------------------------------------------------
+  # 22. ACTIVEPIECES
+  # --------------------------------------------------------
+  # Local chart (charts/activepieces-helm) — uses `sources` escape hatch because
+  # a path-based chart source must be paired with a separate ref: values source
+  # to make $values available in helm valueFiles.
+  activepieces:
+    enabled: false
+    namespace: aps
+    project: default
+    syncWave: 20
+    sources:
+      - repoURL: "{{ .Values.repoURL }}"
+        targetRevision: "{{ .Values.targetRevision }}"
+        path: charts/activepieces-helm
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/opensource-services/activepieces-values.yaml
+      - repoURL: "{{ .Values.repoURL }}"
+        targetRevision: "{{ .Values.targetRevision }}"
+        ref: values
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 23. GRIST
+  # --------------------------------------------------------
+  grist:
+    enabled: false
+    namespace: grist
+    project: default
+    syncWave: 20
+    localChart:
+      path: charts/grist
+    syncOptions:
+      - CreateNamespace=true
+  # --------------------------------------------------------
+  # 24. ARGO EVENTS
+  # --------------------------------------------------------
+  argo-events:
+    enabled: false
+    namespace: argo-events
+    project: default
+    syncWave: 5
+    chart:
+      repoURL: https://argoproj.github.io/argo-helm
+      targetRevision: 2.4.21
+      name: argo-events
+    syncOptions:
+      - CreateNamespace=true
+  # --------------------------------------------------------
+  # 25. OPERATON
+  # --------------------------------------------------------
+  operaton:
+    enabled: false
+    namespace: operaton
+    project: default
+    syncWave: 20
+    chart:
+      repoURL: https://operaton.github.io/operaton-helm
+      targetRevision: 1.0.5
+      name: operaton
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 26. OPERATON BPMN SYNC
+  # --------------------------------------------------------
+  # Local chart. Receives GitLab push webhooks and deploys
+  # BPMN/CMMN files from the source repo into Operaton.
+  # Runs in the same namespace as Operaton (syncWave: 21).
+  operaton-bpmn-sync:
+    enabled: false
+    namespace: operaton
+    project: default
+    syncWave: 21
+    localChart:
+      path: charts/operaton-bpmn-sync
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # 27. HERTZBEAT
+  # --------------------------------------------------------
+  # Local chart (charts/hertzbeat). Supports H2 (default), external
+  # PostgreSQL/MySQL, VictoriaMetrics/DuckDB history store, Redis real-time
+  # store, SMTP alerting, and collector cluster registration on port 1158.
+  # Default account: admin / hertzbeat
+  hertzbeat:
+    enabled: false
+    namespace: hertzbeat
+    project: default
+    syncWave: 20
+    localChart:
+      path: charts/hertzbeat
+    syncOptions:
+      - CreateNamespace=true
+  # --------------------------------------------------------
+  # 28. CAMUNDA PLATFORM
+  # --------------------------------------------------------
+  camunda:
+    enabled: false
+    namespace: camunda
+    project: default
+    syncWave: 30
+    chart:
+      repoURL: https://helm.camunda.io
+      targetRevision: 14.0.1
+      name: camunda-platform
+    syncOptions:
+      - CreateNamespace=true
+  # --------------------------------------------------------
+  # 29. N8N
+  # --------------------------------------------------------
+  # Uses `sources` escape hatch: the OCI chart requires repoURL with the chart
+  # name embedded and path: . — this is a path-based ArgoCD source, not a
+  # chart: source, so the chart: helper cannot express it.
+  n8n:
+    enabled: false
+    namespace: n8n
+    project: default
+    syncWave: 20
+    sources:
+      - repoURL: "{{ .Values.repoURL }}"
+        targetRevision: "{{ .Values.targetRevision }}"
+        ref: values
+      - repoURL: oci://ghcr.io/n8n-io/n8n-helm-chart/n8n
+        path: .
+        targetRevision: 1.4.3
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/opensource-services/n8n-values.yaml
+    syncOptions:
+      - CreateNamespace=true
+
+  # ==========================================================
+  # VALKEY — extra instances in other namespaces
+  # ==========================================================
+  # Each instance deploys the same valkey chart into a different namespace.
+  # Values file: values/valkey/<instance.name>-values.yaml
+  # ==========================================================
+  valkey-instances:
+    enabled: false
+    project: default
+    syncWave: 10
+    valuesDir: valkey
+    chart:
+      repoURL: https://valkey.io/valkey-helm/
+      targetRevision: 0.9.3
+      name: valkey
+    syncOptions:
+      - CreateNamespace=true
+    instances:
+      - name: valkey-common
+        namespace: common
+
+  # ==========================================================
+  # CNPG CLUSTERS  (localChart: charts/cnpg-cluster)
+  # ==========================================================
+  # One entry deploys all CNPG clusters via the local chart.
+  # Values file: values/cnpg/<instance.name>-values.yaml
+  # Each instance can override syncWave independently.
+  # ==========================================================
+  cnpg-clusters:
+    enabled: false
+    project: default
+    syncWave: 11         # default; each instance may override
+    valuesDir: cnpg
+    localChart:
+      path: charts/cnpg-cluster
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    ignoreDifferences:
+      - group: postgresql.cnpg.io
+        kind: Cluster
+        jsonPointers:
+          - /status
+          - /metadata/finalizers
+      - group: postgresql.cnpg.io
+        kind: Database
+        jsonPointers:
+          - /status
+          - /metadata/finalizers
+      - group: barmancloud.cnpg.io
+        kind: ObjectStore
+        jsonPointers:
+          - /status
+    instances:
+      # - name: vault-db-dev
+      #   namespace: vault
+      #   syncWave: 10
+      # - name: credential-broker-db
+      #   namespace: credential-broker
+      #   syncWave: 20
+      # - name: authentik-postgres-db
+      #   namespace: authentik
+      #   syncWave: 11
+      # - name: project-stage-main-db
+      #   namespace: project-db-stage
+      #   syncWave: 11
+      # - name: gitlab-db
+      #   namespace: gitlab
+      #   syncWave: 11
+      - name: woist-db
+        namespace: woist
+        syncWave: 11
+      # - name: project-dev-db-v2
+      #   namespace: project-dev-db
+      #   syncWave: 12
+      - name: common-cnpg-cluster
+        namespace: common
+        syncWave: 20
+      # - name: harbor-db
+      #   namespace: harbor
+      #   syncWave: 20
+      # - name: camunda-db
+      #   namespace: camunda
+      #   syncWave: 30
+  # ==========================================================
+  # CNPG CLUSTERS  (Official Chart: cnpg/cluster)
+  # ==========================================================
+  # One entry deploys all CNPG clusters via the official chart.
+  # Values file: values/cnpg/<instance.name>-values.yaml
+  # Each instance can override syncWave independently.
+  # ==========================================================
+  cnpg-clusters-official:
+    enabled: false
+    project: default
+    syncWave: 11         # default; each instance may override
+    valuesDir: cnpg
+    chart:
+      repoURL: https://cloudnative-pg.github.io/charts
+      targetRevision: 0.6.0
+      name: cluster
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    ignoreDifferences:
+      - group: postgresql.cnpg.io
+        kind: Cluster
+        jsonPointers:
+          - /status
+          - /metadata/finalizers
+      - group: postgresql.cnpg.io
+        kind: Database
+        jsonPointers:
+          - /status
+          - /metadata/finalizers
+      - group: barmancloud.cnpg.io
+        kind: ObjectStore
+        jsonPointers:
+          - /status
+    instances:
+      # - name: vault-db-dev
+      #   namespace: vault
+      #   syncWave: 10
+      # - name: credential-broker-db
+      #   namespace: credential-broker
+      #   syncWave: 20
+      # - name: authentik-postgres-db
+      #   namespace: authentik
+      #   syncWave: 11
+      # - name: project-stage-main-db
+      #   namespace: project-db-stage
+      #   syncWave: 11
+      # - name: gitlab-db
+      #   namespace: gitlab
+      #   syncWave: 11

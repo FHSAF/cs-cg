@@ -1,0 +1,23 @@
+# TEST 07 – Legacy single source (path-based, no helm chart)
+# Uses the legacy `source` field for a plain directory app.
+# Verifies: emits `source:` (singular) with repoURL, targetRevision, path.
+projectName: test-cluster
+repoURL: https://github.com/example/repo.git
+targetRevision: main
+destinationServer: https://kubernetes.default.svc
+environment: test
+
+apps:
+  my-plain-app:
+    enabled: true
+    namespace: my-app
+    project: default
+    syncWave: 20
+    source:
+      repoURL: "{{ .Values.repoURL }}"
+      targetRevision: "{{ .Values.targetRevision }}"
+      path: "clusters/test-cluster/test/my-plain-app"
+      directory:
+        recurse: true
+    syncOptions:
+      - CreateNamespace=true

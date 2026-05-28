@@ -1,0 +1,23 @@
+# TEST 04 – Extra value files on the chart source
+# Uses chart.extraValueFiles to append a second value file alongside the convention path.
+# Verifies: both the convention path AND the extra file appear in the chart source.
+projectName: test-cluster
+repoURL: https://github.com/example/repo.git
+targetRevision: main
+destinationServer: https://kubernetes.default.svc
+environment: test
+
+apps:
+  tempo:
+    enabled: true
+    namespace: monitoring
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: https://grafana.github.io/helm-charts
+      targetRevision: 1.24.3
+      name: tempo
+      extraValueFiles:
+        - "$values/clusters/test-cluster/test/values/opensource-services/tempo-secrets.yaml"
+    syncOptions:
+      - CreateNamespace=true

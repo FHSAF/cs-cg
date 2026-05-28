@@ -1,0 +1,21 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: core-root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: "https://github.com/FHSAF/cs-cg.git"
+    targetRevision: main
+    path: charts/cluster-core
+    helm:
+      valueFiles:
+      - ../../clusters/edgar/_core/values/core-values.yaml
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: applications
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: ["CreateNamespace=true"]

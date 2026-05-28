@@ -1,0 +1,25 @@
+# TEST 06 – Chart version override + custom valueFiles
+# Overrides chart.targetRevision and chart.valueFiles in the cluster values.
+# Verifies: the new version appears in sources, and the custom value file is used
+#           instead of the convention path.
+projectName: test-cluster
+repoURL: https://github.com/example/repo.git
+targetRevision: main
+destinationServer: https://kubernetes.default.svc
+environment: test
+
+apps:
+  authentik:
+    enabled: true
+    namespace: authentik
+    project: default
+    syncWave: 10
+    chart:
+      repoURL: https://charts.goauthentik.io
+      targetRevision: 2026.3.0          # bumped version override
+      name: authentik
+      valueFiles:
+        - "$values/clusters/test-cluster/test/values/opensource-services/authentik-values.yaml"
+        - "$values/clusters/test-cluster/test/values/opensource-services/authentik-ldap.yaml"
+    syncOptions:
+      - CreateNamespace=true

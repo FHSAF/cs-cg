@@ -1,0 +1,31 @@
+# -- Replica count for the deployment.
+replicaCount: 1
+
+config:
+  # -- Argo CD Image Update log level.
+  # log.level: "debug"
+
+  # -- Configuration for container registries.
+  registries:
+    - name: Harbor Registry
+      api_url: https://harbor.example.com
+      prefix: harbor.example.com/project-name
+      ping: yes
+      credentials: secret:argocd/harbor-aiu-token#token
+
+# -- Extra arguments for the argocd-image-updater container.
+extraArgs:
+  # -- Run image update check every minute.
+  - --interval
+  - 2m
+rbac:
+  enabled: true
+serviceAccount:
+  create: true
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 250m
+    memory: 256Mi

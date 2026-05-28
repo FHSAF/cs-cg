@@ -1,0 +1,103 @@
+clusterName: k3s
+repoURL: "https://github.com/FHSAF/cs-cg.git"
+targetRevision: main
+destinationServer: 'https://kubernetes.default.svc'
+
+projects:
+  # # -----------------------------------------
+  # # Default Project (for core apps)
+  # # -----------------------------------------
+  # - name: default
+  #   enabled: true
+  #   description: "Default project for core applications"
+  #   destinations: ["*"]  # Allows deployment to any namespace/server
+  # --------------------------------------------------------
+  # DEV PROJECT
+  # --------------------------------------------------------
+  - name: argocd-dev-project
+    enabled: true
+    description: "Development environment resources"
+    destinations:
+      - namespace: dev
+        server: https://kubernetes.default.svc
+      - namespace: monitoring
+        server: https://kubernetes.default.svc
+      - namespace: argocd
+        server: https://kubernetes.default.svc
+    
+    # Simplified Role Management
+    roles:
+      # Role 1: Admins (Name matches Group Name)
+      - name: "k3s-stage-argocd-admins"
+        description: "Full Admin access for K3s Stage Team"
+        # These policies generate the complex CSV lines automatically
+        policies:
+          - resources: ["applications", "applicationsets", "repositories", "logs", "exec"]
+            verbs: ["*"]
+            objects: ["*"]  # Matches all apps in this project
+
+      # Role 2: Viewers
+      - name: "k3s-stage-argocd-viewers"
+        description: "Read-only access"
+        policies:
+          - resources: ["applications", "logs"]
+            verbs: ["get", "list"]
+            objects: ["*"]
+
+
+  # --------------------------------------------------------
+  # STAGE PROJECT
+  # --------------------------------------------------------
+  - name: argocd-stage-project
+    enabled: true
+    description: "Stage environment resources"
+    destinations:
+      - namespace: stage
+        server: https://kubernetes.default.svc
+    roles:
+      - name: "k3s-stage-argocd-admins"
+        policies:
+          - resources: ["*"]
+            verbs: ["*"]
+            objects: ["*"]
+      - name: "k3s-microservices-operators-stage"
+        policies:
+          - resources: ["applications", "logs"]
+            verbs: ["get", "sync"]
+            objects: ["stage-*"]  # Matches all apps in this project
+# ==========================================================
+# Core Applications
+# ==========================================================
+# Keys become the Application name.
+# You can enable/disable them per environment.
+apps:
+  
+  
+  # --------------------------------------------------------
+  # Metrics Server
+  # --------------------------------------------------------
+  metrics-server:
+    enabled: true
+  # --------------------------------------------------------
+  # ArgoCD Instance
+  # --------------------------------------------------------
+  argocd:
+    enabled: true
+  # --------------------------------------------------------
+  # Argocd Image Updater
+  # --------------------------------------------------------
+  argocd-image-updater:
+    enabled: true
+
+  # --------------------------------------------------------
+  # Certificate Resource (Git Value File)
+  # --------------------------------------------------------
+  certificate:
+    enabled: true
+    namespace: traefik
+    syncWave: "3"
+    project: default
+    sources:
+      - repoURL: '{{ .Values.repoURL }}'
+        targetRevision: '{{ .Values.targetRevision }}'
+        path: clusters/{{ .Values.clusterName }}/_core/values/certificates
