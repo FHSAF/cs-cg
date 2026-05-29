@@ -1,0 +1,4 @@
+clusterName: internal
+apps:
+  cert-manager:
+    enabled: true
