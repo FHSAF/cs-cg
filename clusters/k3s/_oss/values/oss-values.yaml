@@ -71,3 +71,6 @@ apps:
       - name: aarza-pgcluster
         namespace: aarza
         syncWave: 11
+      - name: sadra-pg
+        namespace: sadra
+        syncWave: 11
