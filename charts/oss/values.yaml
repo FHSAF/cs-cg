@@ -575,6 +575,35 @@ apps:
         ref: values
     syncOptions:
       - CreateNamespace=true
+  # --------------------------------------------------------
+  # Operator Lifecycle Manager
+  # --------------------------------------------------------
+  olm:
+    enabled: false
+    namespace: olm
+    syncWave: 5
+    project: default
+    source:
+      repoURL: https://github.com/operator-framework/operator-lifecycle-manager.git
+      targetRevision: master
+      path: deploy/chart
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # Operator Controller (OLM v1)
+  # --------------------------------------------------------
+  operator-controller:
+    enabled: false
+    namespace: olm
+    syncWave: 6
+    project: default
+    source:
+      repoURL: https://github.com/operator-framework/operator-controller.git
+      targetRevision: main
+      path: helm/olmv1
+    syncOptions:
+      - CreateNamespace=true
   # ==========================================================
   # VALKEY — extra instances in other namespaces
   # ==========================================================
@@ -620,35 +649,7 @@ apps:
 
   
 
-  # --------------------------------------------------------
-  # Operator Lifecycle Manager
-  # --------------------------------------------------------
-  olm:
-    enabled: false
-    namespace: olm
-    syncWave: 5
-    project: default
-    source:
-      repoURL: https://github.com/operator-framework/operator-lifecycle-manager.git
-      targetRevision: master
-      path: deploy/chart
-    syncOptions:
-      - CreateNamespace=true
-
-  # --------------------------------------------------------
-  # Operator Controller (OLM v1)
-  # --------------------------------------------------------
-  operator-controller:
-    enabled: false
-    namespace: olm
-    syncWave: 6
-    project: default
-    source:
-      repoURL: https://github.com/operator-framework/operator-controller.git
-      targetRevision: main
-      path: helm/olmv1
-    syncOptions:
-      - CreateNamespace=true
+  
   cnpg-instances:
     enabled: false
     project: default
@@ -683,3 +684,5 @@ apps:
         jsonPointers:
           - /status
     instances:
+  psmdb-instances:
+    enabled: true
