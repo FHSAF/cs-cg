@@ -50,7 +50,7 @@ apps:
     enabled: true
     namespace: moodle
     syncWave: 20
-  pdmdb-isntances:
+  pdmdb-instances:
     enabled: true
   valkey-instances:
     enabled: true
