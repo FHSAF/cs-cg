@@ -685,4 +685,4 @@ apps:
           - /status
     instances:
   psmdb-instances:
-    enabled: true
+    enabled: false
