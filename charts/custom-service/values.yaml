@@ -1,0 +1,94 @@
+# Default values for custom-service.
+# This is a YAML file.
+# Declare variables to be passed into your templates.
+
+global:
+  image:
+    pullSecret: ""
+    repositoryBase: ""
+    tag: ""
+  service:
+    enabled: false
+  ingress:
+    enabled: false
+  serviceAccount:
+    create: false
+  replicaCount: 0
+
+# Override replica count. If not set, global.replicaCount will be used.
+# replicaCount: 1
+
+image:
+  repository: ""
+  tag: ""
+  pullSecret: ""
+
+service:
+  enabled: false
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  # - host: chart-example.local
+  #   paths:
+  #     - path: /
+  #       pathType: Prefix
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# Environment variables. Supports either a list of env variables or a key-value map.
+env: {}
+# env:
+#   DB_HOST: "postgres"
+#   DB_PORT: "5432"
+# OR:
+# env:
+#   - name: DB_HOST
+#     value: "postgres"
+
+# EnvFrom allows mounting entire ConfigMaps or Secrets as env variables.
+envFrom: []
+# envFrom:
+#   - configMapRef:
+#       name: special-config
+#   - secretRef:
+#       name: special-secrets
+
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+# Block Storage Media Persistence
+persistence:
+  enabled: false
+  mountPath: /data
+  subPath: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  storageClass: ""
+  # Optional manual PVC name override. If not empty, chart won't create PVC but will mount this pre-existing one.
+  existingClaim: ""
+
+# Escape hatch for additional volumes & volume mounts
+volumes: []
+volumeMounts: []

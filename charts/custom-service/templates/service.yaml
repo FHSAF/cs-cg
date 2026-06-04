@@ -1,0 +1,22 @@
+{{- $serviceEnabled := coalesce .Values.service.enabled .Values.global.service.enabled false -}}
+{{- if $serviceEnabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "custom-service.fullname" . }}
+  labels:
+    {{- include "custom-service.labels" . | nindent 4 }}
+  {{- if .Values.service.annotations }}
+  annotations:
+    {{- toYaml .Values.service.annotations | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type | default "ClusterIP" }}
+  ports:
+    - port: {{ .Values.service.port | default 80 }}
+      targetPort: {{ .Values.service.targetPort | default .Values.service.port | default 80 }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "custom-service.selectorLabels" . | nindent 4 }}
+{{- end }}

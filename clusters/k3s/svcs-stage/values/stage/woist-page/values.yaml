@@ -1,0 +1,13 @@
+# Here we define the configuration for the microservice.
+# The following settings are not defined here:
+# - image settings (pull secret, repository base and tag) which are defined in images.yaml
+# - service, ingress and service account settings which are defined in connections.yaml
+# - resources settings (CPU and memory requests and limits) which are defined in resources.yaml
+# The settings defined here include, but not limited to:
+# - replica count
+# - gitOps settings (repo URL)
+# - Argo CD Image Updater settings (enabled, git creds secret name, branch, update strategy, allow tags, values path)
+# - Enviroment variables, config maps, and secrets settings.
+# - Scaling settings (HPA, VPA, etc.)
+# - Volumes and volume mounts settings.
+# - Any other settings that are not defined in the above mentioned files.

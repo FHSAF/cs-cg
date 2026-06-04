@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "custom-service.fullname" . }}
+  labels:
+    {{- include "custom-service.labels" . | nindent 4 }}
+spec:
+  {{- $replicas := 1 }}
+  {{- if not (kindIs "invalid" .Values.replicaCount) }}
+    {{- $replicas = .Values.replicaCount }}
+  {{- else if not (kindIs "invalid" .Values.global.replicaCount) }}
+    {{- $replicas = .Values.global.replicaCount }}
+  {{- end }}
+  replicas: {{ $replicas }}
+  selector:
+    matchLabels:
+      {{- include "custom-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "custom-service.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- $pullSecret := .Values.image.pullSecret | default .Values.global.image.pullSecret }}
+      {{- if $pullSecret }}
+      imagePullSecrets:
+        - name: {{ $pullSecret }}
+      {{- end }}
+      {{- $saCreate := coalesce .Values.serviceAccount.create .Values.global.serviceAccount.create false }}
+      {{- $serviceAccountName := .Values.serviceAccount.name }}
+      {{- if not $serviceAccountName }}
+        {{- if $saCreate }}
+          {{- $serviceAccountName = include "custom-service.fullname" . }}
+        {{- else }}
+          {{- $serviceAccountName = "default" }}
+        {{- end }}
+      {{- end }}
+      serviceAccountName: {{ $serviceAccountName }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- $repository := .Values.image.repository | default .Chart.Name }}
+          {{- $tag := .Values.image.tag | default .Values.global.image.tag | default "latest" }}
+          {{- $repoBase := .Values.global.image.repositoryBase | default "" }}
+          {{- if and $repoBase (not (hasSuffix "/" $repoBase)) }}
+            {{- $repoBase = printf "%s/" $repoBase }}
+          {{- end }}
+          image: "{{ $repoBase }}{{ $repository }}:{{ $tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          {{- if .Values.env }}
+          env:
+            {{- if kindIs "slice" .Values.env }}
+              {{- toYaml .Values.env | nindent 12 }}
+            {{- else }}
+              {{- range $k, $v := .Values.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.envFrom }}
+          envFrom:
+            {{- toYaml .Values.envFrom | nindent 12 }}
+          {{- end }}
+          {{- if .Values.ports }}
+          ports:
+            {{- toYaml .Values.ports | nindent 12 }}
+          {{- else if .Values.service.enabled }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort | default .Values.service.port | default 80 }}
+              protocol: TCP
+          {{- end }}
+          {{- if .Values.resources }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            {{- if .Values.persistence.enabled }}
+            - name: persistence-volume
+              mountPath: {{ .Values.persistence.mountPath | default "/data" }}
+              {{- if .Values.persistence.subPath }}
+              subPath: {{ .Values.persistence.subPath }}
+              {{- end }}
+            {{- end }}
+            {{- if .Values.volumeMounts }}
+              {{- toYaml .Values.volumeMounts | nindent 12 }}
+            {{- end }}
+      volumes:
+        {{- if .Values.persistence.enabled }}
+        - name: persistence-volume
+          persistentVolumeClaim:
+            claimName: {{ if .Values.persistence.existingClaim }}{{ .Values.persistence.existingClaim }}{{ else }}{{ include "custom-service.fullname" . }}{{ end }}
+        {{- end }}
+        {{- if .Values.volumes }}
+          {{- toYaml .Values.volumes | nindent 8 }}
+        {{- end }}

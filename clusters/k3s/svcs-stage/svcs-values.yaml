@@ -1,0 +1,38 @@
+# This is just an example of how the global generic helm chart values.yaml could look like. It is not meant to be used as is, but rather as a template for the actual values.yaml files in the clusters.
+global:
+  gitOps:
+    repoURL: "https://github.com/FHSAF/cs-cg.git"
+  image:
+    pullSecret: "harbor-pull-secret-project-ds"
+    repositoryBase: "harbor.tecomon.net/project/"
+    tag: "0.1.0-main.0"
+  service:
+    enabled: false
+  ingress:
+    enabled: false
+  serviceAccount:
+    create: false
+  replicaCount: 0
+  # This is usually only for dev
+  argocdImageUpdater:
+    enabled: false
+    gitCredsSecretName: "git-creds"
+    branch: "main"
+    updateStrategy: "newest-build"
+    # Optional tag filter passed to Argo CD Image Updater.
+    # Example for dev builds: regexp:^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$
+    allowTags: ""
+    
+applications:
+  mp-api:
+    enabled: true
+    namespace: stage
+  woist-page:
+    enabled: true
+    namespace: stage
+  app1:
+    enabled: false
+    namespace: stageho
+  app2:
+    enabled: false
+    namespace: stageho

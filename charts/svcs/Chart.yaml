@@ -1,0 +1,6 @@
+apiVersion: v2
+name: svcs
+description: A bootstrapper Helm chart (App-of-Apps) for custom services in cs-cg
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

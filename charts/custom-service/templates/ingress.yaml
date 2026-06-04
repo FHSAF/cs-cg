@@ -1,0 +1,36 @@
+{{- $ingressEnabled := coalesce .Values.ingress.enabled .Values.global.ingress.enabled false -}}
+{{- if $ingressEnabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "custom-service.fullname" . }}
+  labels:
+    {{- include "custom-service.labels" . | nindent 4 }}
+  {{- if .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- toYaml .Values.ingress.tls | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ if and .backend .backend.serviceName }}{{ .backend.serviceName }}{{ else }}{{ include "custom-service.fullname" $ }}{{ end }}
+                port:
+                  number: {{ if and .backend .backend.servicePort }}{{ .backend.servicePort }}{{ else }}{{ $.Values.service.port | default 80 }}{{ end }}
+          {{- end }}
+    {{- end }}
+{{- end }}

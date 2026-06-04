@@ -1,0 +1,181 @@
+{{- range $appName, $appConfig := .Values.applications }}
+{{- if ne $appConfig.enabled false }}
+
+{{- $instances := coalesce $appConfig.instances $appConfig.intances -}}
+{{- if $instances }}
+
+{{/* ================================================================
+     MULTI-INSTANCE FAN-OUT MODE
+     ================================================================ */}}
+{{- range $inst := $instances }}
+{{- if ne $inst.enabled false }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $inst.name }}
+  namespace: argocd
+  {{- $parentDir := $appName -}}
+  {{- if hasSuffix "-instances" $appName -}}
+    {{- $parentDir = printf "_%s" (trimSuffix "-instances" $appName) -}}
+  {{- else if hasSuffix "-intances" $appName -}}
+    {{- $parentDir = printf "_%s" (trimSuffix "-intances" $appName) -}}
+  {{- end }}
+  {{- $imageName := trimSuffix "-instances" $appName | trimSuffix "-intances" -}}
+  {{- $writeBackTarget := printf "file:../../clusters/%s/%s/values/%s/%s/%s/images.yaml" $.Values.clusterName $.Values.categoryName $parentDir $inst.namespace $inst.name -}}
+  {{- $updaterGlobal := $.Values.global.argocdImageUpdater | default dict -}}
+  {{- $updaterApp := $appConfig.argocdImageUpdater | default dict -}}
+  {{- $updaterEnabled := coalesce $updaterApp.enabled $updaterGlobal.enabled false }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ $inst.syncWave | default $appConfig.syncWave | default "0" | quote }}
+    {{- if $updaterEnabled }}
+    {{- $gitCredsSecretName := coalesce $updaterApp.gitCredsSecretName $updaterGlobal.gitCredsSecretName "git-creds" -}}
+    {{- $branch := coalesce $updaterApp.branch $updaterGlobal.branch "main" -}}
+    {{- $updateStrategy := coalesce $updaterApp.updateStrategy $updaterGlobal.updateStrategy "newest-build" -}}
+    {{- $allowTags := coalesce $updaterApp.allowTags $updaterGlobal.allowTags "" -}}
+    {{- $repoBase := $.Values.global.image.repositoryBase | default "" -}}
+    {{- if and $repoBase (not (hasSuffix "/" $repoBase)) -}}
+      {{- $repoBase = printf "%s/" $repoBase -}}
+    {{- end }}
+    argocd-image-updater.argoproj.io/image-list: myimage={{ $repoBase }}{{ $imageName }}
+    argocd-image-updater.argoproj.io/myimage.update-strategy: {{ $updateStrategy }}
+    {{- if $allowTags }}
+    argocd-image-updater.argoproj.io/myimage.allow-tags: {{ $allowTags }}
+    {{- end }}
+    argocd-image-updater.argoproj.io/write-back-method: git
+    argocd-image-updater.argoproj.io/write-back-target: {{ $writeBackTarget }}
+    argocd-image-updater.argoproj.io/git-branch: {{ $branch }}
+    argocd-image-updater.argoproj.io/write-back-credentials: secret:argocd/{{ $gitCredsSecretName }}
+    argocd-image-updater.argoproj.io/myimage.helm.image-name: image.repository
+    argocd-image-updater.argoproj.io/myimage.helm.image-tag: image.tag
+    {{- end }}
+    {{- if $appConfig.annotations }}
+    {{- toYaml $appConfig.annotations | nindent 4 }}
+    {{- end }}
+  {{- if $appConfig.labels }}
+  labels:
+    {{- toYaml $appConfig.labels | nindent 4 }}
+  {{- end }}
+spec:
+  project: {{ $appConfig.project | default "default" }}
+  {{- if $appConfig.ignoreDifferences }}
+  ignoreDifferences:
+    {{- toYaml $appConfig.ignoreDifferences | nindent 4 }}
+  {{- end }}
+  destination:
+    server: {{ $.Values.destinationServer | default "https://kubernetes.default.svc" }}
+    namespace: {{ $inst.namespace }}
+  sources:
+    - repoURL: {{ $.Values.global.gitOps.repoURL }}
+      targetRevision: {{ $.Values.targetRevision | default "main" }}
+      path: charts/custom-service
+      helm:
+        valueFiles:
+          - $values/clusters/{{ $.Values.clusterName }}/{{ $.Values.categoryName }}/svcs-values.yaml
+          - $values/clusters/{{ $.Values.clusterName }}/{{ $.Values.categoryName }}/values/{{ $parentDir }}/{{ $inst.namespace }}/{{ $inst.name }}/values.yaml
+          - $values/clusters/{{ $.Values.clusterName }}/{{ $.Values.categoryName }}/values/{{ $parentDir }}/{{ $inst.namespace }}/{{ $inst.name }}/images.yaml
+          - $values/clusters/{{ $.Values.clusterName }}/{{ $.Values.categoryName }}/values/{{ $parentDir }}/{{ $inst.namespace }}/{{ $inst.name }}/connections.yaml
+          - $values/clusters/{{ $.Values.clusterName }}/{{ $.Values.categoryName }}/values/{{ $parentDir }}/{{ $inst.namespace }}/{{ $inst.name }}/resources.yaml
+        values: |
+          argocdImageUpdater:
+            valuesPath: {{ printf "../../clusters/%s/%s/values/%s/%s/%s/images.yaml" $.Values.clusterName $.Values.categoryName $parentDir $inst.namespace $inst.name | quote }}
+    - repoURL: {{ $.Values.global.gitOps.repoURL }}
+      targetRevision: {{ $.Values.targetRevision | default "main" }}
+      ref: values
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      {{- if $appConfig.syncOptions }}
+      {{- toYaml $appConfig.syncOptions | nindent 6 }}
+      {{- end }}
+{{- end }}
+{{- end }}
+
+{{- else }}
+
+{{/* ================================================================
+     SINGLE MODE
+     ================================================================ */}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName }}
+  namespace: argocd
+  {{- $imageName := $appName -}}
+  {{- $writeBackTarget := printf "file:../../clusters/%s/%s/values/%s/%s/images.yaml" $.Values.clusterName $.Values.categoryName $appConfig.namespace $appName -}}
+  {{- $updaterGlobal := $.Values.global.argocdImageUpdater | default dict -}}
+  {{- $updaterApp := $appConfig.argocdImageUpdater | default dict -}}
+  {{- $updaterEnabled := coalesce $updaterApp.enabled $updaterGlobal.enabled false }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ $appConfig.syncWave | default "0" | quote }}
+    {{- if $updaterEnabled }}
+    {{- $gitCredsSecretName := coalesce $updaterApp.gitCredsSecretName $updaterGlobal.gitCredsSecretName "git-creds" -}}
+    {{- $branch := coalesce $updaterApp.branch $updaterGlobal.branch "main" -}}
+    {{- $updateStrategy := coalesce $updaterApp.updateStrategy $updaterGlobal.updateStrategy "newest-build" -}}
+    {{- $allowTags := coalesce $updaterApp.allowTags $updaterGlobal.allowTags "" -}}
+    {{- $repoBase := $.Values.global.image.repositoryBase | default "" -}}
+    {{- if and $repoBase (not (hasSuffix "/" $repoBase)) -}}
+      {{- $repoBase = printf "%s/" $repoBase -}}
+    {{- end }}
+    argocd-image-updater.argoproj.io/image-list: myimage={{ $repoBase }}{{ $imageName }}
+    argocd-image-updater.argoproj.io/myimage.update-strategy: {{ $updateStrategy }}
+    {{- if $allowTags }}
+    argocd-image-updater.argoproj.io/myimage.allow-tags: {{ $allowTags }}
+    {{- end }}
+    argocd-image-updater.argoproj.io/write-back-method: git
+    argocd-image-updater.argoproj.io/write-back-target: {{ $writeBackTarget }}
+    argocd-image-updater.argoproj.io/git-branch: {{ $branch }}
+    argocd-image-updater.argoproj.io/write-back-credentials: secret:argocd/{{ $gitCredsSecretName }}
+    argocd-image-updater.argoproj.io/myimage.helm.image-name: image.repository
+    argocd-image-updater.argoproj.io/myimage.helm.image-tag: image.tag
+    {{- end }}
+    {{- if $appConfig.annotations }}
+    {{- toYaml $appConfig.annotations | nindent 4 }}
+    {{- end }}
+  {{- if $appConfig.labels }}
+  labels:
+    {{- toYaml $appConfig.labels | nindent 4 }}
+  {{- end }}
+spec:
+  project: {{ $appConfig.project | default "default" }}
+  {{- if $appConfig.ignoreDifferences }}
+  ignoreDifferences:
+    {{- toYaml $appConfig.ignoreDifferences | nindent 4 }}
+  {{- end }}
+  destination:
+    server: {{ $.Values.destinationServer | default "https://kubernetes.default.svc" }}
+    namespace: {{ $appConfig.namespace }}
+  sources:
+    - repoURL: {{ $.Values.global.gitOps.repoURL }}
+      targetRevision: {{ $.Values.targetRevision | default "main" }}
+      path: charts/custom-service
+      helm:
+        valueFiles:
+          - $values/clusters/{{ $.Values.clusterName }}/{{ $.Values.categoryName }}/svcs-values.yaml
+          - $values/clusters/{{ $.Values.clusterName }}/{{ $.Values.categoryName }}/values/{{ $appConfig.namespace }}/{{ $appName }}/values.yaml
+          - $values/clusters/{{ $.Values.clusterName }}/{{ $.Values.categoryName }}/values/{{ $appConfig.namespace }}/{{ $appName }}/images.yaml
+          - $values/clusters/{{ $.Values.clusterName }}/{{ $.Values.categoryName }}/values/{{ $appConfig.namespace }}/{{ $appName }}/connections.yaml
+          - $values/clusters/{{ $.Values.clusterName }}/{{ $.Values.categoryName }}/values/{{ $appConfig.namespace }}/{{ $appName }}/resources.yaml
+        values: |
+          argocdImageUpdater:
+            valuesPath: {{ printf "../../clusters/%s/%s/values/%s/%s/images.yaml" $.Values.clusterName $.Values.categoryName $appConfig.namespace $appName | quote }}
+    - repoURL: {{ $.Values.global.gitOps.repoURL }}
+      targetRevision: {{ $.Values.targetRevision | default "main" }}
+      ref: values
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      {{- if $appConfig.syncOptions }}
+      {{- toYaml $appConfig.syncOptions | nindent 6 }}
+      {{- end }}
+
+{{- end }}
+{{- end }}
+{{- end }}

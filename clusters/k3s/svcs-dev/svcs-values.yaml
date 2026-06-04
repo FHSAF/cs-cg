@@ -1,0 +1,50 @@
+global:
+  gitOps:
+    repoURL: "https://github.com/FHSAF/cs-cg.git"
+  image:
+    pullSecret: "harbor-pull-secret-project-ds"
+    repositoryBase: "harbor.tecomon.net/project/"
+    tag: "0.1.0-main.0"
+  service:
+    enabled: false
+  ingress:
+    enabled: false
+  serviceAccount:
+    create: false
+  replicaCount: 0
+  argocdImageUpdater:
+    enabled: false
+    gitCredsSecretName: "git-creds"
+    branch: "main"
+    updateStrategy: "newest-build"
+    # Optional tag filter passed to Argo CD Image Updater.
+    # Example for dev builds: regexp:^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$
+    allowTags: ""
+    # Path to the DEDICATED IMAGES values file (relative to chart path). That should be updated via image updater.
+    # Pattern: ../../clusters/{clusterName}/{category prefied with svcs-}/values/{namespace}/{appName}/images.yaml
+    
+    # example for stage tenant mp-api: ../../clusters/k3s/svcs-dev/values/dev/mp-api/images.yaml
+applications:
+  mp-api:
+    enabled: true
+    namespace: dev
+  woist-page:
+    enabled: true
+    namespace: dev
+  app1:
+    enabled: false
+    namespace: devho
+  app2:
+    enabled: false
+    namespace: devho
+  app3-intances:
+    enabled: true
+    intances:
+      - name: instance1
+        namespace: devo
+      - name: instance2
+        namespace: devo
+      - name: instance3
+        namespace: devor
+      - name: instance4
+        namespace: devor

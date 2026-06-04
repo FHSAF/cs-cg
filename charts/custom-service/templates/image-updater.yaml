@@ -1,0 +1,48 @@
+{{- $updaterGlobal := .Values.global.argocdImageUpdater | default dict -}}
+{{- $updaterApp := .Values.argocdImageUpdater | default dict -}}
+{{- $updaterEnabled := coalesce $updaterApp.enabled $updaterGlobal.enabled false -}}
+{{- if $updaterEnabled }}
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: {{ .Release.Name }}-image-updater
+  namespace: argocd
+spec:
+  # Where Argo CD Application objects live
+  namespace: argocd
+  # Global write-back config (shared repo + branch + creds)
+  writeBackConfig:
+    method: "git:secret:argocd/{{ $updaterApp.gitCredsSecretName | default $updaterGlobal.gitCredsSecretName | default "git-creds" }}"
+    gitConfig:
+      repository: {{ .Values.global.gitOps.repoURL | quote }}
+      branch: {{ $updaterApp.branch | default $updaterGlobal.branch | default "main" | quote }}
+  applicationRefs:
+    - namePattern: "{{ .Release.Name }}"
+      images:
+        - alias: {{ .Release.Name }}
+          {{- $repository := .Values.image.repository | default .Chart.Name -}}
+          {{- $repoBase := .Values.global.image.repositoryBase | default "" -}}
+          {{- if and $repoBase (not (hasSuffix "/" $repoBase)) -}}
+            {{- $repoBase = printf "%s/" $repoBase -}}
+          {{- end }}
+          imageName: {{ printf "%s%s" $repoBase $repository | quote }}
+          manifestTargets:
+            helm:
+              name: "image.repository"
+              tag: "image.tag"
+          commonUpdateSettings:
+            updateStrategy: {{ $updaterApp.updateStrategy | default $updaterGlobal.updateStrategy | default "newest-build" | quote }}
+            {{- $allowTags := coalesce $updaterApp.allowTags $updaterGlobal.allowTags }}
+            {{- if $allowTags }}
+            allowTags: {{ $allowTags | quote }}
+            {{- end }}
+            forceUpdate: true
+      {{- $valuesPath := $updaterApp.valuesPath | default $updaterGlobal.valuesPath }}
+      {{- if $valuesPath }}
+      # Values file (relative to spec.source.path in Application)
+      writeBackConfig:
+        method: "git:secret:argocd/{{ $updaterApp.gitCredsSecretName | default $updaterGlobal.gitCredsSecretName | default "git-creds" }}"
+        gitConfig:
+          writeBackTarget: "helmvalues:{{ $valuesPath }}"
+      {{- end }}
+{{- end }}

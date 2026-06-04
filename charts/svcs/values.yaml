@@ -1,0 +1,31 @@
+# Default values for svcs.
+# This is a YAML file.
+# Declare variables to be passed into your templates.
+
+clusterName: k3s
+categoryName: svcs-dev
+targetRevision: main
+destinationServer: https://kubernetes.default.svc
+
+global:
+  gitOps:
+    repoURL: ""
+  image:
+    pullSecret: ""
+    repositoryBase: ""
+    tag: ""
+  service:
+    enabled: false
+  ingress:
+    enabled: false
+  serviceAccount:
+    create: false
+  replicaCount: 0
+  argocdImageUpdater:
+    enabled: false
+    gitCredsSecretName: "git-creds"
+    branch: "main"
+    updateStrategy: "newest-build"
+    allowTags: ""
+
+applications: {}
