@@ -618,75 +618,7 @@ apps:
       - name: meilisearch-common
         namespace: common
 
-  # ==========================================================
-  # CNPG CLUSTERS  (localChart: charts/cnpg-cluster)
-  # ==========================================================
-  # One entry deploys all CNPG clusters via the local chart.
-  # Values file: values/cnpg/<instance.name>-values.yaml
-  # Each instance can override syncWave independently.
-  # ==========================================================
-  cnpg-clusters:
-    enabled: false
-    project: default
-    syncWave: 11         # default; each instance may override
-    valuesDir: cnpg
-    localChart:
-      path: charts/cnpg
-    syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
-    ignoreDifferences:
-      - group: postgresql.cnpg.io
-        kind: Cluster
-        jsonPointers:
-          - /status
-          - /metadata/finalizers
-      - group: postgresql.cnpg.io
-        kind: Database
-        jsonPointers:
-          - /status
-          - /metadata/finalizers
-      - group: barmancloud.cnpg.io
-        kind: ObjectStore
-        jsonPointers:
-          - /status
-    instances:
-      # - name: vault-db-dev
-      #   namespace: vault
-      #   syncWave: 10
-      # - name: credential-broker-db
-      #   namespace: credential-broker
-      #   syncWave: 20
-      # - name: authentik-postgres-db
-      #   namespace: authentik
-      #   syncWave: 11
-      # - name: sag-stage-main-db
-      #   namespace: sag-db-stage
-      #   syncWave: 11
-      # - name: gitlab-db
-      #   namespace: gitlab
-      #   syncWave: 11
-      - name: woist-db
-        namespace: woist
-        syncWave: 11
-      # - name: sag-dev-db-v2
-      #   namespace: sag-dev-db
-      #   syncWave: 12
-      - name: common-cnpg-cluster
-        namespace: common
-        syncWave: 20
-      # - name: harbor-db
-      #   namespace: harbor
-      #   syncWave: 20
-      # - name: camunda-db
-      #   namespace: camunda
-      #   syncWave: 30
+  
 
   # --------------------------------------------------------
   # Operator Lifecycle Manager
@@ -717,7 +649,7 @@ apps:
       path: helm/olmv1
     syncOptions:
       - CreateNamespace=true
-  cnpg-clusters-official:
+  cnpg-instances:
     enabled: false
     project: default
     syncWave: 11         # default; each instance may override

@@ -109,9 +109,7 @@ apps:
         namespace: mp
         syncWave: 20
       
-  
-
-  cnpg-clusters-official:
+  cnpg-instances:
     enabled: true
     instances:
       - name: odoo-pgcluster
