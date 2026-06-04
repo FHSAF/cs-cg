@@ -5,7 +5,7 @@ destinationServer: https://kubernetes.default.svc
 environment: prod
 apps:
   kps:
-    enabled: false
+    enabled: true
     extraPath: clusters/sag/prod/values/kube-prometheus-stack
   ak:
     enabled: false
