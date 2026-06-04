@@ -1,0 +1,3 @@
+apps:
+  kps:
+    enabled: true
