@@ -20,8 +20,8 @@ apps:
         chart: vault
         helm:
           valueFiles:
-            - "$values/clusters/test-cluster/test/values/opensource-services/vault-values.yaml"
-            - "$values/clusters/test-cluster/test/values/opensource-services/vault-override.yaml"
+            - "$values/clusters/test-cluster/test/values/oss/vault-values.yaml"
+            - "$values/clusters/test-cluster/test/values/oss/vault-override.yaml"
       - repoURL: https://github.com/example/repo.git
         targetRevision: main
         ref: values

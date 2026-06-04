@@ -19,7 +19,7 @@ apps:
       targetRevision: 2026.3.0          # bumped version override
       name: authentik
       valueFiles:
-        - "$values/clusters/test-cluster/test/values/opensource-services/authentik-values.yaml"
-        - "$values/clusters/test-cluster/test/values/opensource-services/authentik-ldap.yaml"
+        - "$values/clusters/test-cluster/test/values/oss/authentik-values.yaml"
+        - "$values/clusters/test-cluster/test/values/oss/authentik-ldap.yaml"
     syncOptions:
       - CreateNamespace=true

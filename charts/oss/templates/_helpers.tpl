@@ -1,8 +1,8 @@
 {{/*
 Render a value through Go templating if it is a string, otherwise pass through.
-Usage: {{ include "opensource-services.render" (dict "val" .Values.path "context" $) }}
+Usage: {{ include "oss.render" (dict "val" .Values.path "context" $) }}
 */}}
-{{- define "opensource-services.render" -}}
+{{- define "oss.render" -}}
     {{- $val := .val -}}
     {{- $context := .context -}}
     {{- if kindIs "string" $val -}}
@@ -15,13 +15,13 @@ Usage: {{ include "opensource-services.render" (dict "val" .Values.path "context
 {{/*
 Generate the conventional value-file path for an app (used when chart.valueFiles is not set).
 Convention: $values/clusters/<projectName>/<environment>/values/<valuesDir>/<appName>-values.yaml
-valuesDir defaults to "opensource-services" when not set on the app.
-Usage: {{ include "opensource-services.defaultValuesFile" (dict "appName" "valkey" "valuesDir" "valkey" "context" $) }}
+valuesDir defaults to "oss" when not set on the app.
+Usage: {{ include "oss.defaultValuesFile" (dict "appName" "valkey" "valuesDir" "valkey" "context" $) }}
 */}}
-{{- define "opensource-services.defaultValuesFile" -}}
+{{- define "oss.defaultValuesFile" -}}
 {{- $projectName := tpl .context.Values.projectName .context -}}
 {{- $environment := tpl .context.Values.environment .context -}}
-{{- $dir := .valuesDir | default "opensource-services" -}}
+{{- $dir := .valuesDir | default "oss" -}}
 {{- printf "$values/clusters/%s/%s/values/%s/%s-values.yaml" $projectName $environment $dir .appName -}}
 {{- end -}}
 
@@ -38,31 +38,31 @@ chart fields:
   values          (optional) inline helm values block
   parameters      (optional) list of helm parameter overrides
 
-Usage: {{ include "opensource-services.chartSource" (dict "app" $appConfig "appName" $appName "context" $) }}
+Usage: {{ include "oss.chartSource" (dict "app" $appConfig "appName" $appName "context" $) }}
 */}}
-{{- define "opensource-services.chartSource" -}}
+{{- define "oss.chartSource" -}}
 {{- $app  := .app -}}
 {{- $name := .appName -}}
 {{- $ctx  := .context -}}
 {{- $c    := $app.chart -}}
-- repoURL: {{ include "opensource-services.render" (dict "val" $c.repoURL "context" $ctx) }}
-  targetRevision: {{ include "opensource-services.render" (dict "val" $c.targetRevision "context" $ctx) }}
+- repoURL: {{ include "oss.render" (dict "val" $c.repoURL "context" $ctx) }}
+  targetRevision: {{ include "oss.render" (dict "val" $c.targetRevision "context" $ctx) }}
   chart: {{ $c.name }}
   helm:
     valueFiles:
     {{- if $c.valueFiles }}
       {{- range $c.valueFiles }}
-      - {{ include "opensource-services.render" (dict "val" . "context" $ctx) }}
+      - {{ include "oss.render" (dict "val" . "context" $ctx) }}
       {{- end }}
     {{- else }}
-      - {{ include "opensource-services.defaultValuesFile" (dict "appName" $name "valuesDir" $app.valuesDir "context" $ctx) }}
+      - {{ include "oss.defaultValuesFile" (dict "appName" $name "valuesDir" $app.valuesDir "context" $ctx) }}
     {{- end }}
     {{- range $c.extraValueFiles }}
-      - {{ include "opensource-services.render" (dict "val" . "context" $ctx) }}
+      - {{ include "oss.render" (dict "val" . "context" $ctx) }}
     {{- end }}
     {{- if $c.values }}
     values: |
-      {{- include "opensource-services.render" (dict "val" $c.values "context" $ctx) | nindent 6 }}
+      {{- include "oss.render" (dict "val" $c.values "context" $ctx) | nindent 6 }}
     {{- end }}
     {{- if $c.parameters }}
     parameters:
@@ -82,9 +82,9 @@ localChart fields:
   values          (optional) inline helm values block
   parameters      (optional) list of helm parameter overrides
 
-Usage: {{ include "opensource-services.localChartSource" (dict "app" $appConfig "appName" $appName "context" $) }}
+Usage: {{ include "oss.localChartSource" (dict "app" $appConfig "appName" $appName "context" $) }}
 */}}
-{{- define "opensource-services.localChartSource" -}}
+{{- define "oss.localChartSource" -}}
 {{- $app  := .app -}}
 {{- $name := .appName -}}
 {{- $ctx  := .context -}}
@@ -96,17 +96,17 @@ Usage: {{ include "opensource-services.localChartSource" (dict "app" $appConfig 
     valueFiles:
     {{- if $lc.valueFiles }}
       {{- range $lc.valueFiles }}
-      - {{ include "opensource-services.render" (dict "val" . "context" $ctx) }}
+      - {{ include "oss.render" (dict "val" . "context" $ctx) }}
       {{- end }}
     {{- else }}
-      - {{ include "opensource-services.defaultValuesFile" (dict "appName" $name "valuesDir" $app.valuesDir "context" $ctx) }}
+      - {{ include "oss.defaultValuesFile" (dict "appName" $name "valuesDir" $app.valuesDir "context" $ctx) }}
     {{- end }}
     {{- range $lc.extraValueFiles }}
-      - {{ include "opensource-services.render" (dict "val" . "context" $ctx) }}
+      - {{ include "oss.render" (dict "val" . "context" $ctx) }}
     {{- end }}
     {{- if $lc.values }}
     values: |
-      {{- include "opensource-services.render" (dict "val" $lc.values "context" $ctx) | nindent 6 }}
+      {{- include "oss.render" (dict "val" $lc.values "context" $ctx) | nindent 6 }}
     {{- end }}
     {{- if $lc.parameters }}
     parameters:
@@ -118,9 +118,9 @@ Usage: {{ include "opensource-services.localChartSource" (dict "app" $appConfig 
 Render the values-ref source (always injected alongside a chart source so that
 $values can be used in helm valueFiles references).
 Always uses the global $.Values.repoURL and $.Values.targetRevision.
-Usage: {{ include "opensource-services.valuesRefSource" (dict "context" $) }}
+Usage: {{ include "oss.valuesRefSource" (dict "context" $) }}
 */}}
-{{- define "opensource-services.valuesRefSource" -}}
+{{- define "oss.valuesRefSource" -}}
 {{- $ctx := .context -}}
 - repoURL: {{ $ctx.Values.repoURL }}
   targetRevision: {{ $ctx.Values.targetRevision }}
@@ -133,18 +133,18 @@ Render a generic source entry (used for extraSources and the escape-hatch source
 Supported fields: repoURL, targetRevision, chart, name (alias for chart),
 path, ref, directory, helm.valueFiles, helm.extraValueFiles, helm.values, helm.parameters
 
-Usage: {{ include "opensource-services.genericSource" (dict "source" $src "context" $) }}
+Usage: {{ include "oss.genericSource" (dict "source" $src "context" $) }}
 */}}
-{{- define "opensource-services.genericSource" -}}
+{{- define "oss.genericSource" -}}
 {{- $s   := .source -}}
 {{- $ctx := .context -}}
-- repoURL: {{ include "opensource-services.render" (dict "val" $s.repoURL "context" $ctx) }}
-  targetRevision: {{ include "opensource-services.render" (dict "val" $s.targetRevision "context" $ctx) }}
+- repoURL: {{ include "oss.render" (dict "val" $s.repoURL "context" $ctx) }}
+  targetRevision: {{ include "oss.render" (dict "val" $s.targetRevision "context" $ctx) }}
   {{- if (or $s.chart $s.name) }}
   chart: {{ coalesce $s.chart $s.name }}
   {{- end }}
   {{- if $s.path }}
-  path: {{ include "opensource-services.render" (dict "val" $s.path "context" $ctx) }}
+  path: {{ include "oss.render" (dict "val" $s.path "context" $ctx) }}
   {{- end }}
   {{- if $s.ref }}
   ref: {{ $s.ref }}
@@ -158,15 +158,15 @@ Usage: {{ include "opensource-services.genericSource" (dict "source" $src "conte
     {{- if $s.helm.valueFiles }}
     valueFiles:
       {{- range $s.helm.valueFiles }}
-      - {{ include "opensource-services.render" (dict "val" . "context" $ctx) }}
+      - {{ include "oss.render" (dict "val" . "context" $ctx) }}
       {{- end }}
     {{- end }}
     {{- range $s.helm.extraValueFiles }}
-      - {{ include "opensource-services.render" (dict "val" . "context" $ctx) }}
+      - {{ include "oss.render" (dict "val" . "context" $ctx) }}
     {{- end }}
     {{- if $s.helm.values }}
     values: |
-      {{- include "opensource-services.render" (dict "val" $s.helm.values "context" $ctx) | nindent 6 }}
+      {{- include "oss.render" (dict "val" $s.helm.values "context" $ctx) | nindent 6 }}
     {{- end }}
     {{- if $s.helm.parameters }}
     parameters:

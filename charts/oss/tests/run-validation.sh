@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # =============================================================
-# Validation tests for charts/opensource-services
+# Validation tests for charts/oss
 # =============================================================
 # Usage:
 #   ./tests/run-validation.sh                 (from chart root)
-#   cd charts/opensource-services && ./tests/run-validation.sh
+#   cd charts/oss && ./tests/run-validation.sh
 #
 # Requires: helm (v3+)
 # Returns exit code 0 if all tests pass, 1 if any fail.
@@ -134,7 +134,7 @@ header "TEST 04 – extraValueFiles: added to chart source"
 OUT=$(render "04-extra-value-files.yaml")
 assert_valid_yaml "04-extra-value-files.yaml"
 assert_contains "${OUT}" \
-  "\$values/clusters/test-cluster/test/values/opensource-services/tempo-values.yaml" \
+  "\$values/clusters/test-cluster/test/values/oss/tempo-values.yaml" \
   "convention value-file still present"
 assert_contains "${OUT}" \
   "tempo-secrets.yaml" \
@@ -175,7 +175,7 @@ assert_contains "${OUT}" \
 # When valueFiles is set explicitly, the string 'convention path' should not appear
 # (i.e. no extra duplicate of the same file from auto-generation side effects)
 assert_not_contains "${OUT}" \
-  "opensource-services.defaultValuesFile" \
+  "oss.defaultValuesFile" \
   "no raw helper name leaks into rendered output"
 
 # ------------------------------------------------------------------
@@ -194,13 +194,13 @@ assert_not_contains "${OUT}" \
   "legacy mode uses singular 'source:', not 'sources:'"
 
 # ------------------------------------------------------------------
-header "TEST 08 – Real cluster values: Internals/dev"
+header "TEST 08 – Real cluster values: sag/prod"
 # ------------------------------------------------------------------
-CLUSTER_VALS="${CHART_DIR}/../../clusters/Internals/dev/values/opensource-services-values.yaml"
+CLUSTER_VALS="${CHART_DIR}/../../clusters/sag/prod/values/oss-values.yaml"
 CLUSTER_TMPFILE=$(mktemp /tmp/oss-test08.XXXXXX)
 if helm template test-release "${CHART_DIR}" \
     --values "${CLUSTER_VALS}" > "${CLUSTER_TMPFILE}" 2>&1; then
-  pass "Internals/dev cluster values render without errors"
+  pass "sag/prod cluster values render without errors"
   grep -q "name: loki"       "${CLUSTER_TMPFILE}" \
     && pass "loki Application object present"       || fail "loki Application object present"
   grep -q "name: authentik"  "${CLUSTER_TMPFILE}" \
@@ -210,7 +210,7 @@ if helm template test-release "${CHART_DIR}" \
   ! grep -q "name: mimir"    "${CLUSTER_TMPFILE}" \
     && pass "mimir is disabled and not rendered"    || fail "mimir is disabled and not rendered"
 else
-  fail "Internals/dev cluster values failed to render"
+  fail "sag/prod cluster values failed to render"
   head -30 "${CLUSTER_TMPFILE}" || true
 fi
 rm -f "${CLUSTER_TMPFILE}"

@@ -35,21 +35,21 @@ spec:
     {{- $mergedApp := deepCopy $appConfig }}
     {{- if $inst.extraValueFiles }}
     {{- $merged := merge (dict "localChart" (merge (deepCopy $appConfig.localChart) (dict "extraValueFiles" (concat ($appConfig.localChart.extraValueFiles | default list) $inst.extraValueFiles)))) $mergedApp }}
-    {{- include "opensource-services.localChartSource" (dict "app" $merged "appName" $inst.name "context" $) | nindent 4 }}
+    {{- include "oss.localChartSource" (dict "app" $merged "appName" $inst.name "context" $) | nindent 4 }}
     {{- else }}
-    {{- include "opensource-services.localChartSource" (dict "app" $appConfig "appName" $inst.name "context" $) | nindent 4 }}
+    {{- include "oss.localChartSource" (dict "app" $appConfig "appName" $inst.name "context" $) | nindent 4 }}
     {{- end }}
     {{- else if $appConfig.chart }}
-    {{- include "opensource-services.chartSource" (dict "app" $appConfig "appName" $inst.name "context" $) | nindent 4 }}
+    {{- include "oss.chartSource" (dict "app" $appConfig "appName" $inst.name "context" $) | nindent 4 }}
     {{- end }}
-    {{- include "opensource-services.valuesRefSource" (dict "context" $) | nindent 4 }}
+    {{- include "oss.valuesRefSource" (dict "context" $) | nindent 4 }}
     {{- if $appConfig.extraPath }}
     - repoURL: {{ $.Values.repoURL }}
       targetRevision: {{ $.Values.targetRevision }}
-      path: {{ include "opensource-services.render" (dict "val" $appConfig.extraPath "context" $) }}
+      path: {{ include "oss.render" (dict "val" $appConfig.extraPath "context" $) }}
     {{- end }}
     {{- range $appConfig.extraSources }}
-    {{- include "opensource-services.genericSource" (dict "source" . "context" $) | nindent 4 }}
+    {{- include "oss.genericSource" (dict "source" . "context" $) | nindent 4 }}
     {{- end }}
   syncPolicy:
     automated:
@@ -111,51 +111,51 @@ spec:
   {{/* ---- ESCAPE HATCH: fully custom sources list ---- */}}
   sources:
     {{- range $appConfig.sources }}
-    {{- include "opensource-services.genericSource" (dict "source" . "context" $) | nindent 4 }}
+    {{- include "oss.genericSource" (dict "source" . "context" $) | nindent 4 }}
     {{- end }}
 
   {{- else if $appConfig.localChart }}
   {{/* ---- LOCAL CHART: selfRepo path chart, auto-assembles sources ---- */}}
   sources:
     {{/* (a) local chart source — convention valueFile, respects valuesDir */}}
-    {{- include "opensource-services.localChartSource" (dict "app" $appConfig "appName" $appName "context" $) | nindent 4 }}
+    {{- include "oss.localChartSource" (dict "app" $appConfig "appName" $appName "context" $) | nindent 4 }}
     {{/* (b) Values-ref source — always injected to support $values in valueFiles */}}
-    {{- include "opensource-services.valuesRefSource" (dict "context" $) | nindent 4 }}
+    {{- include "oss.valuesRefSource" (dict "context" $) | nindent 4 }}
     {{/* (c) Extra-path source — selfRepo path, rendered only when extraPath is set */}}
     {{- if $appConfig.extraPath }}
     - repoURL: {{ $.Values.repoURL }}
       targetRevision: {{ $.Values.targetRevision }}
-      path: {{ include "opensource-services.render" (dict "val" $appConfig.extraPath "context" $) }}
+      path: {{ include "oss.render" (dict "val" $appConfig.extraPath "context" $) }}
     {{- end }}
     {{/* (d) Additional fully-custom sources appended at the end */}}
     {{- range $appConfig.extraSources }}
-    {{- include "opensource-services.genericSource" (dict "source" . "context" $) | nindent 4 }}
+    {{- include "oss.genericSource" (dict "source" . "context" $) | nindent 4 }}
     {{- end }}
 
   {{- else if $appConfig.chart }}
   {{/* ---- DRY DEFAULT: auto-assembled sources ---- */}}
   sources:
     {{/* (a) Helm chart source — value file path uses convention unless overridden */}}
-    {{- include "opensource-services.chartSource" (dict "app" $appConfig "appName" $appName "context" $) | nindent 4 }}
+    {{- include "oss.chartSource" (dict "app" $appConfig "appName" $appName "context" $) | nindent 4 }}
     {{/* (b) Values-ref source — always injected to support $values in valueFiles */}}
-    {{- include "opensource-services.valuesRefSource" (dict "context" $) | nindent 4 }}
+    {{- include "oss.valuesRefSource" (dict "context" $) | nindent 4 }}
     {{/* (c) Extra-path source — selfRepo path, rendered only when extraPath is set */}}
     {{- if $appConfig.extraPath }}
     - repoURL: {{ $.Values.repoURL }}
       targetRevision: {{ $.Values.targetRevision }}
-      path: {{ include "opensource-services.render" (dict "val" $appConfig.extraPath "context" $) }}
+      path: {{ include "oss.render" (dict "val" $appConfig.extraPath "context" $) }}
     {{- end }}
     {{/* (d) Additional fully-custom sources appended at the end */}}
     {{- range $appConfig.extraSources }}
-    {{- include "opensource-services.genericSource" (dict "source" . "context" $) | nindent 4 }}
+    {{- include "oss.genericSource" (dict "source" . "context" $) | nindent 4 }}
     {{- end }}
 
   {{- else if $appConfig.source }}
   {{/* ---- LEGACY: single source ---- */}}
   source:
-    repoURL: {{ include "opensource-services.render" (dict "val" $appConfig.source.repoURL "context" $) }}
-    targetRevision: {{ include "opensource-services.render" (dict "val" $appConfig.source.targetRevision "context" $) }}
-    path: {{ include "opensource-services.render" (dict "val" $appConfig.source.path "context" $) }}
+    repoURL: {{ include "oss.render" (dict "val" $appConfig.source.repoURL "context" $) }}
+    targetRevision: {{ include "oss.render" (dict "val" $appConfig.source.targetRevision "context" $) }}
+    path: {{ include "oss.render" (dict "val" $appConfig.source.path "context" $) }}
     {{- if $appConfig.source.directory }}
     directory:
       {{- toYaml $appConfig.source.directory | nindent 6 }}

@@ -1,9 +1,9 @@
 # ==========================================================
 # Global Cluster Configuration
 # ==========================================================
-projectName: internal
+projectName: sag
 # The base URL for your GitOps repo
-repoURL: https://github.com/FHSAF/cs-cg.git
+repoURL: https://github.com/sadra-group/infra-code.git
 # The revision to track (HEAD, main, v1.0, etc.)
 targetRevision: main
 # Where these Application resources (the "App of Apps") live
@@ -11,7 +11,7 @@ destinationServer: https://kubernetes.default.svc
 environment: dev
 
 # Convention value-file path for every app:
-#   $values/clusters/<projectName>/<environment>/values/opensource-services/<appName>-values.yaml
+#   $values/clusters/<projectName>/<environment>/values/oss/<appName>-values.yaml
 
 # ==========================================================
 # How sources work (DRY design reference)
@@ -28,7 +28,7 @@ environment: dev
 #                      chart.repoURL / chart.targetRevision / chart.name
 #                      valueFiles  → defaults to convention path when absent:
 #                        $values/clusters/<projectName>/<environment>/
-#                                         values/opensource-services/<appName>-values.yaml
+#                                         values/oss/<appName>-values.yaml
 #                      extraValueFiles → appended after main valueFiles
 #                      values / parameters → optional
 #                (b) Values-ref source (ref: values)
@@ -62,14 +62,14 @@ projects:
         server: https://kubernetes.default.svc
 
     roles:
-      - name: "project-stage-argocd-admins"
-        description: "Full Admin access for project Stage Team"
+      - name: "sag-stage-argocd-admins"
+        description: "Full Admin access for Sag Stage Team"
         policies:
           - resources: ["applications", "applicationsets", "repositories", "logs", "exec"]
             verbs: ["*"]
             objects: ["*"]
 
-      - name: "project-stage-argocd-viewers"
+      - name: "sag-stage-argocd-viewers"
         description: "Read-only access"
         policies:
           - resources: ["applications", "logs"]
@@ -224,7 +224,7 @@ apps:
     syncWave: 10
     chart:
       repoURL: https://charts.goauthentik.io
-      targetRevision: 2026.5.0
+      targetRevision: 2026.2.2
       name: authentik
     syncOptions:
       - CreateNamespace=true
@@ -238,7 +238,7 @@ apps:
     syncWave: 10
     chart:
       repoURL: https://charts.goauthentik.io
-      targetRevision: 2026.5.0
+      targetRevision: 2026.2.2
       name: authentik
     syncOptions:
       - CreateNamespace=true
@@ -348,13 +348,13 @@ apps:
         chart: cloudnative-pg
         helm:
           valueFiles:
-            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/opensource-services/cnpg-values.yaml
+            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/oss/cnpg-values.yaml
       - repoURL: https://cloudnative-pg.github.io/charts
         targetRevision: 0.5.0
         chart: plugin-barman-cloud
         helm:
           valueFiles:
-            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/opensource-services/cnpg-barman-values.yaml
+            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/oss/cnpg-barman-values.yaml
       - repoURL: "{{ .Values.repoURL }}"
         targetRevision: "{{ .Values.targetRevision }}"
         ref: values
@@ -393,7 +393,7 @@ apps:
         chart: harbor
         helm:
           valueFiles:
-            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/opensource-services/harbor-values.yaml
+            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/oss/harbor-values.yaml
       - repoURL: "{{ .Values.repoURL }}"
         targetRevision: HEAD
         ref: values
@@ -453,7 +453,7 @@ apps:
       - CreateNamespace=true
 
   # --------------------------------------------------------
-  # 20. SUPERSET (Apache official)
+  # 21. SUPERSET (Apache official)
   # --------------------------------------------------------
   superset:
     enabled: false
@@ -468,7 +468,7 @@ apps:
       - CreateNamespace=true
 
   # --------------------------------------------------------
-  # 21. CREDENTIAL BROKER PLATFORM
+  # 18. CREDENTIAL BROKER PLATFORM
   # --------------------------------------------------------
   credential-broker:
     enabled: false
@@ -481,7 +481,7 @@ apps:
       - ServerSideApply=true
 
   # --------------------------------------------------------
-  # 22. ACTIVEPIECES
+  # 20. ACTIVEPIECES
   # --------------------------------------------------------
   # Local chart (charts/activepieces-helm) — uses `sources` escape hatch because
   # a path-based chart source must be paired with a separate ref: values source
@@ -497,7 +497,7 @@ apps:
         path: charts/activepieces-helm
         helm:
           valueFiles:
-            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/opensource-services/activepieces-values.yaml
+            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/oss/activepieces-values.yaml
       - repoURL: "{{ .Values.repoURL }}"
         targetRevision: "{{ .Values.targetRevision }}"
         ref: values
@@ -505,7 +505,7 @@ apps:
       - CreateNamespace=true
 
   # --------------------------------------------------------
-  # 23. GRIST
+  # 22. GRIST
   # --------------------------------------------------------
   grist:
     enabled: false
@@ -517,7 +517,7 @@ apps:
     syncOptions:
       - CreateNamespace=true
   # --------------------------------------------------------
-  # 24. ARGO EVENTS
+  # 23. ARGO EVENTS
   # --------------------------------------------------------
   argo-events:
     enabled: false
@@ -531,90 +531,50 @@ apps:
     syncOptions:
       - CreateNamespace=true
   # --------------------------------------------------------
-  # 25. OPERATON
+  # 24. ODOO
   # --------------------------------------------------------
-  operaton:
+  odoo:
     enabled: false
-    namespace: operaton
-    project: default
-    syncWave: 20
-    chart:
-      repoURL: https://operaton.github.io/operaton-helm
-      targetRevision: 1.0.5
-      name: operaton
-    syncOptions:
-      - CreateNamespace=true
-
-  # --------------------------------------------------------
-  # 26. OPERATON BPMN SYNC
-  # --------------------------------------------------------
-  # Local chart. Receives GitLab push webhooks and deploys
-  # BPMN/CMMN files from the source repo into Operaton.
-  # Runs in the same namespace as Operaton (syncWave: 21).
-  operaton-bpmn-sync:
-    enabled: false
-    namespace: operaton
-    project: default
-    syncWave: 21
-    localChart:
-      path: charts/operaton-bpmn-sync
-    syncOptions:
-      - CreateNamespace=true
-
-  # --------------------------------------------------------
-  # 27. HERTZBEAT
-  # --------------------------------------------------------
-  # Local chart (charts/hertzbeat). Supports H2 (default), external
-  # PostgreSQL/MySQL, VictoriaMetrics/DuckDB history store, Redis real-time
-  # store, SMTP alerting, and collector cluster registration on port 1158.
-  # Default account: admin / hertzbeat
-  hertzbeat:
-    enabled: false
-    namespace: hertzbeat
-    project: default
-    syncWave: 20
-    localChart:
-      path: charts/hertzbeat
-    syncOptions:
-      - CreateNamespace=true
-  # --------------------------------------------------------
-  # 28. CAMUNDA PLATFORM
-  # --------------------------------------------------------
-  camunda:
-    enabled: false
-    namespace: camunda
-    project: default
-    syncWave: 30
-    chart:
-      repoURL: https://helm.camunda.io
-      targetRevision: 14.0.1
-      name: camunda-platform
-    syncOptions:
-      - CreateNamespace=true
-  # --------------------------------------------------------
-  # 29. N8N
-  # --------------------------------------------------------
-  # Uses `sources` escape hatch: the OCI chart requires repoURL with the chart
-  # name embedded and path: . — this is a path-based ArgoCD source, not a
-  # chart: source, so the chart: helper cannot express it.
-  n8n:
-    enabled: false
-    namespace: n8n
+    namespace: odoo
     project: default
     syncWave: 20
     sources:
       - repoURL: "{{ .Values.repoURL }}"
         targetRevision: "{{ .Values.targetRevision }}"
-        ref: values
-      - repoURL: oci://ghcr.io/n8n-io/n8n-helm-chart/n8n
-        path: .
-        targetRevision: 1.4.3
+        path: charts/odoo
         helm:
           valueFiles:
-            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/opensource-services/n8n-values.yaml
+            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/oss/odoo-values.yaml
+      - repoURL: "{{ .Values.repoURL }}"
+        targetRevision: "{{ .Values.targetRevision }}"
+        ref: values
     syncOptions:
       - CreateNamespace=true
 
+  # --------------------------------------------------------
+  # 25. MOODLE
+  # --------------------------------------------------------
+  # Local chart (charts/moodle) — uses `sources` escape hatch so that the
+  # path-based chart source can reference $values for cluster value files.
+  # Image: bitnami/moodle (free, PostgreSQL-capable, Moodle pre-installed).
+  # Requires: external CNPG PostgreSQL + pre-created admin credentials Secret.
+  moodle:
+    enabled: false
+    namespace: moodle
+    project: default
+    syncWave: 20
+    sources:
+      - repoURL: "{{ .Values.repoURL }}"
+        targetRevision: "{{ .Values.targetRevision }}"
+        path: charts/moodle
+        helm:
+          valueFiles:
+            - $values/clusters/{{ .Values.projectName }}/{{ .Values.environment }}/values/oss/moodle-values.yaml
+      - repoURL: "{{ .Values.repoURL }}"
+        targetRevision: "{{ .Values.targetRevision }}"
+        ref: values
+    syncOptions:
+      - CreateNamespace=true
   # ==========================================================
   # VALKEY — extra instances in other namespaces
   # ==========================================================
@@ -637,6 +597,28 @@ apps:
         namespace: common
 
   # ==========================================================
+  # MEILISEARCH — extra instances in other namespaces
+  # ==========================================================
+  # Each instance deploys the same meilisearch chart into a different
+  # namespace.
+  # Values file: values/meilisearch/<instance.name>-values.yaml
+  # ==========================================================
+  meilisearch-instances:
+    enabled: false
+    project: default
+    syncWave: 20
+    valuesDir: meilisearch
+    chart:
+      repoURL: https://meilisearch.github.io/meilisearch-kubernetes
+      targetRevision: 0.32.0
+      name: meilisearch
+    syncOptions:
+      - CreateNamespace=true
+    instances:
+      - name: meilisearch-common
+        namespace: common
+
+  # ==========================================================
   # CNPG CLUSTERS  (localChart: charts/cnpg-cluster)
   # ==========================================================
   # One entry deploys all CNPG clusters via the local chart.
@@ -649,7 +631,7 @@ apps:
     syncWave: 11         # default; each instance may override
     valuesDir: cnpg
     localChart:
-      path: charts/cnpg-cluster
+      path: charts/cnpg
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
@@ -684,8 +666,8 @@ apps:
       # - name: authentik-postgres-db
       #   namespace: authentik
       #   syncWave: 11
-      # - name: project-stage-main-db
-      #   namespace: project-db-stage
+      # - name: sag-stage-main-db
+      #   namespace: sag-db-stage
       #   syncWave: 11
       # - name: gitlab-db
       #   namespace: gitlab
@@ -693,8 +675,8 @@ apps:
       - name: woist-db
         namespace: woist
         syncWave: 11
-      # - name: project-dev-db-v2
-      #   namespace: project-dev-db
+      # - name: sag-dev-db-v2
+      #   namespace: sag-dev-db
       #   syncWave: 12
       - name: common-cnpg-cluster
         namespace: common
@@ -705,13 +687,36 @@ apps:
       # - name: camunda-db
       #   namespace: camunda
       #   syncWave: 30
-  # ==========================================================
-  # CNPG CLUSTERS  (Official Chart: cnpg/cluster)
-  # ==========================================================
-  # One entry deploys all CNPG clusters via the official chart.
-  # Values file: values/cnpg/<instance.name>-values.yaml
-  # Each instance can override syncWave independently.
-  # ==========================================================
+
+  # --------------------------------------------------------
+  # Operator Lifecycle Manager
+  # --------------------------------------------------------
+  olm:
+    enabled: false
+    namespace: olm
+    syncWave: 5
+    project: default
+    source:
+      repoURL: https://github.com/operator-framework/operator-lifecycle-manager.git
+      targetRevision: master
+      path: deploy/chart
+    syncOptions:
+      - CreateNamespace=true
+
+  # --------------------------------------------------------
+  # Operator Controller (OLM v1)
+  # --------------------------------------------------------
+  operator-controller:
+    enabled: false
+    namespace: olm
+    syncWave: 6
+    project: default
+    source:
+      repoURL: https://github.com/operator-framework/operator-controller.git
+      targetRevision: main
+      path: helm/olmv1
+    syncOptions:
+      - CreateNamespace=true
   cnpg-clusters-official:
     enabled: false
     project: default
@@ -746,18 +751,3 @@ apps:
         jsonPointers:
           - /status
     instances:
-      # - name: vault-db-dev
-      #   namespace: vault
-      #   syncWave: 10
-      # - name: credential-broker-db
-      #   namespace: credential-broker
-      #   syncWave: 20
-      # - name: authentik-postgres-db
-      #   namespace: authentik
-      #   syncWave: 11
-      # - name: project-stage-main-db
-      #   namespace: project-db-stage
-      #   syncWave: 11
-      # - name: gitlab-db
-      #   namespace: gitlab
-      #   syncWave: 11

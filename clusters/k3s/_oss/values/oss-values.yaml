@@ -1,0 +1,122 @@
+# ==========================================================
+# Cluster: sag / Environment: prod
+# ==========================================================
+# Only override what differs from charts/oss/values.yaml.
+# The chart defaults hold all chart metadata (repoURL, versions, namespaces).
+# Convention value-file path (auto-generated per app):
+#   $values/clusters/sag/prod/values/oss/<appName>-values.yaml
+# ==========================================================
+projectName: sag
+repoURL: git@github.com:sadra-group/infra-code.git
+targetRevision: main
+destinationServer: https://kubernetes.default.svc
+environment: prod
+
+# ==========================================================
+# App toggles + per-cluster overrides
+# ==========================================================
+apps:
+
+  # ---- 2. KUBE-PROMETHEUS-STACK ----
+  kps:
+    enabled: false
+    # kps-addons injects the TLS secrets, Namespaces, and the trust Bundle
+    # (clusters/sag/prod/values/kube-prometheus-stack/ directory).
+    extraPath: "clusters/sag/prod/values/kube-prometheus-stack"
+
+  # ---- 8. AUTHENTIK ----
+  ak:
+    enabled: false
+    # authentik-blueprints is a selfRepo Helm chart deployed as an extra source.
+    namespace: ak
+    extraSources:
+      - repoURL: "git@github.com:sadra-group/infra-code.git"
+        targetRevision: main
+        path: charts/ak-bp
+        helm:
+          valueFiles:
+            - "../../clusters/sag/prod/values/ak-bp-values.yaml"
+
+  # ---- 9. VAULT ----
+  vault:
+    enabled: false
+    # vault-addons injects extra raw manifests (VaultAuth, policies, etc.)
+    extraPath: "clusters/sag/prod/values/vault"
+
+  # ---- 10. VAULT-SECRETS-OPERATOR ----
+  vso:
+    enabled: false
+    namespace: vso
+    # Injects VaultConnection CRD + extra ServiceAccounts.
+    extraPath: "clusters/sag/prod/values/vso"
+
+  # ---- 11. CLOUDNATIVE-PG OPERATOR ----
+  cnpg:
+    enabled: false
+
+  # ---- 12. OUTLINE ---
+  outline:
+    enabled: false
+  
+  # ---- 13. OLM ---
+  olm:
+    enabled: false
+    namespace: operator-lifecycle-manager
+    syncWave: 5
+    syncOptions:
+      - CreateNamespace=true
+      - SkipDryRunOnMissingResource=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 1m
+  odoo:
+    enabled: true
+    namespace: odoo
+    syncWave: 20
+
+  # ---- 25. MOODLE ----
+  moodle:
+    enabled: true
+    namespace: moodle
+    syncWave: 20
+
+  # ==========================================================
+  # ==========================================================
+  # CNPG clusters are left disabled to avoid conflicting with
+  # the existing databases/*.yaml ArgoCD Applications.
+  # Migration: set the specific instance enabled:false, then
+  # flip cnpg-clusters.enabled: true here and delete the
+  # matching databases/*.yaml file at the same time.
+
+  valkey-instances:
+    enabled: true
+    instances:
+      - name: valkey-odoo
+        namespace: odoo
+        syncWave: 20
+      - name: valkey-aarza
+        namespace: aarza
+        syncWave: 20
+
+  meilisearch-instances:
+    enabled: true
+    instances:
+      - name: meilisearch-sag
+        namespace: mp
+        syncWave: 20
+      
+  
+
+  cnpg-clusters-official:
+    enabled: true
+    instances:
+      - name: odoo-pgcluster
+        namespace: odoo
+        syncWave: 11
+      - name: aarza-pgcluster
+        namespace: aarza
+        syncWave: 11
